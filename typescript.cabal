@@ -1,0 +1,104 @@
+cabal-version:   3.0
+name:            typescript
+version:         0.1.0.0
+
+-- synopsis:
+-- description:
+license:         BSD-3-Clause
+license-file:    LICENSE
+author:          Hécate Moonlight
+maintainer:      hecate+github@glitchbra.in
+
+-- copyright:
+category:        Compiler
+build-type:      Simple
+extra-doc-files: CHANGELOG.md
+
+-- extra-source-files:
+
+common common-extensions
+  default-extensions:
+    AllowAmbiguousTypes
+    ConstraintKinds
+    DataKinds
+    DeriveAnyClass
+    DeriveGeneric
+    DerivingStrategies
+    DerivingVia
+    DisambiguateRecordFields
+    DuplicateRecordFields
+    FlexibleContexts
+    FlexibleInstances
+    GeneralizedNewtypeDeriving
+    InstanceSigs
+    KindSignatures
+    MultiParamTypeClasses
+    NamedFieldPuns
+    OverloadedLabels
+    OverloadedStrings
+    RankNTypes
+    RecordWildCards
+    ScopedTypeVariables
+    StandaloneDeriving
+    TypeApplications
+    TypeOperators
+
+  default-language:   Haskell2010
+
+common common-ghc-options
+  ghc-options:
+    -Wall -Wcompat -Widentities -Wincomplete-record-updates
+    -Wincomplete-uni-patterns -Wno-unused-do-bind -Wno-deprecations
+    -Wpartial-fields -Wredundant-constraints -fhide-source-paths
+    -funbox-strict-fields
+
+common common-rts-options
+  ghc-options: -rtsopts -threaded -with-rtsopts=-N
+
+library
+  import:           common-extensions
+  import:           common-ghc-options
+  exposed-modules:
+    Lexer
+    Parser
+    AST
+    ASM
+
+  build-depends:
+    , base
+    , megaparsec
+    , text
+    , text-display
+    , parser-combinators
+    , PyF
+
+  hs-source-dirs:   src
+
+executable typescript
+  import:           common-extensions
+  import:           common-ghc-options
+  import:           common-rts-options
+  main-is:          Main.hs
+
+  -- other-modules:
+  -- other-extensions:
+  build-depends:
+    , base
+    , typescript
+
+  hs-source-dirs:   app
+
+test-suite typescript-test
+  import:           common-extensions
+  import:           common-ghc-options
+  import:           common-rts-options
+  type:             exitcode-stdio-1.0
+  hs-source-dirs:   test
+  main-is:          Main.hs
+  build-depends:
+      base
+    , tasty-hunit
+    , tasty
+    , text
+    , typescript
+    , PyF
