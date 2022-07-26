@@ -71,6 +71,8 @@ library
     , text-display
     , parser-combinators
     , PyF
+    , text-display
+    , transformers
 
   hs-source-dirs:   src
 
