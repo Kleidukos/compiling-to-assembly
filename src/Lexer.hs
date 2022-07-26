@@ -2,8 +2,8 @@ module Lexer where
 
 import Data.Text                      ( Text )
 import Data.Void
-import Text.Megaparsec
-import Text.Megaparsec.Char
+import Text.Megaparsec (Parsec, between, (<?>))
+import Text.Megaparsec.Char (space1)
 import qualified Text.Megaparsec.Char.Lexer    as L
 
 type Parser = Parsec Void Text
@@ -24,10 +24,7 @@ symbol :: Text -> Parser Text
 symbol = L.symbol consumeSpaces
 
 integer :: Parser Integer
-integer = lexeme L.decimal
-
-signedInteger :: Parser Integer
-signedInteger = L.signed consumeSpaces integer
+integer = lexeme (L.signed consumeSpaces L.decimal)
 
 parens :: Parser a -> Parser a
 parens = between (symbol "(") (symbol ")")
@@ -36,10 +33,10 @@ braces :: Parser a -> Parser a
 braces = between (symbol "{") (symbol "}")
 
 semicolon :: Parser Text
-semicolon = lexeme (string ";") <?> ";"
+semicolon = lexeme (symbol ";") <?> ";"
 
 assign :: Parser Text
-assign = lexeme (string "=") <?> "="
+assign = lexeme (symbol "=") <?> "="
 
 comma :: Parser Text
-comma = lexeme (string ",") <?> ","
+comma = lexeme (symbol ",") <?> ","

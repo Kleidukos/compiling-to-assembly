@@ -18,12 +18,11 @@ parseLine input =
       Left eb -> Left $ errorBundlePretty eb
       Right ast -> Right ast
 
-statements :: Parser AST
-statements = do
-  consumeSpaces
-  stmts <- many parseStatement
-  eof
-  pure (Block stmts)
+parse :: forall a. (Show a) => Parser a -> Text -> IO ()
+parse parser input =
+  case runParser parser "<line>" input of
+      Left eb -> putStrLn $ errorBundlePretty eb
+      Right result -> print result
 
 -- nonAlphaNumTokens :: [Token Text]
 -- nonAlphaNumTokens = "!?¡¿$€%&|*×÷+-/:<=>@^_~"
@@ -40,6 +39,13 @@ keyword w = string w *> notFollowedBy alphaNumChar *> consumeSpaces
 rws :: [Text] -- list of reserved words
 rws = ["if","then","else","while","true","false"]
 
+-----------------------
+-- ┌───────────────┐ --
+-- │  Expressions  │ --
+-- └───────────────┘ --
+-----------------------
+
+-- ID = token(/[a-zA-Z_][a-zA-Z0-9_]*/y);
 parseTextIdentifier :: Parser Text
 parseTextIdentifier =
   (lexeme . try) (identifierParser >>= check)
@@ -51,43 +57,48 @@ parseTextIdentifier =
 
     identifierParser :: Parser Text
     identifierParser = do
-      beginning <- letterChar
-      rest <- many (letterChar <|> digitChar)
+      beginning <- letterChar <|> char '_'
+      rest <- many (letterChar <|> digitChar <|> char '_')
       pure $ T.pack $ [beginning] <> rest
 
-parseIdentifier :: Parser AST
+parseIdentifier :: Parser Expr
 parseIdentifier = Identifier <$> parseTextIdentifier
 
-parseNumber :: Parser AST
+parseNumber :: Parser Expr
 parseNumber = Number <$> integer
 
-parseNegNumber :: Parser AST
-parseNegNumber = do
-  char '-'
-  d <- integer
-  pure . Number . negate $ d
-
-parseCall :: Parser AST
+-- args <- (expression (COMMA expression)*)?
+-- call <- ID LEFT_PAREN args RIGHT_PAREN
+parseCall :: Parser Expr
 parseCall = label "call" $ do
   callee <- parseTextIdentifier
-  args <- parens (parseIdentifier `sepBy` comma)
+  args <- parens (parseExpression `sepBy` comma)
   if callee == "assert"
   then pure $ Assert (head args)
   else pure $ Call callee args
 
-parseAtom :: Parser AST
-parseAtom =
-  try parseCall
-  <|> parseNumber
-  <|> parens parseIdentifier
+parseTerm :: Parser Expr
+parseTerm = label "term" $
+      parseNumber
+  <|> try parseCall
+  <|> parseIdentifier
+  <|> parens parseExpression
 
-parseUnary :: Parser AST
-parseUnary = do
-  mSign <- optional (char '-')
-  term <- parseAtom
-  case mSign of
-    Nothing -> pure term
-    Just _ -> pure $ Not term
+parseExpression :: Parser Expr
+parseExpression = makeExprParser parseTerm operatorTable <?> "Expression"
+
+----------------------
+-- ┌──────────────┐ --
+-- │  Statements  │ --
+-- └──────────────┘ --
+----------------------
+
+statements :: Parser AST
+statements = do
+  consumeSpaces
+  stmts <- many parseStatement
+  eof
+  pure (Block stmts)
 
 parseStatement :: Parser AST
 parseStatement =
@@ -111,7 +122,7 @@ parseExpressionStatement :: Parser AST
 parseExpressionStatement = do
   term <- parseExpression
   semicolon
-  pure term
+  pure (ExprStmt term)
 
 parseIfStatement :: Parser AST
 parseIfStatement = do
@@ -139,7 +150,7 @@ parseVarStatement = do
   pure $ Var name value
 
 parseAssignStatement :: Parser AST
-parseAssignStatement = do
+parseAssignStatement = label "assign" $ do
   name <- parseTextIdentifier
   assign
   value <- parseExpression
@@ -147,12 +158,12 @@ parseAssignStatement = do
   pure $ Assign name value
 
 parseBlockStatement :: Parser AST
-parseBlockStatement = do
+parseBlockStatement = label "block" $ do
   stmts <- braces $ many parseStatement
   pure $ Block stmts
 
 parseFunctionStatement :: Parser AST
-parseFunctionStatement = do
+parseFunctionStatement = label "function" $ do
   keyword "function"
   name <- parseTextIdentifier
   parameters <- parens (parseTextIdentifier `sepBy` comma)
@@ -160,36 +171,3 @@ parseFunctionStatement = do
   if name == "main"
   then pure $ Main stmts
   else pure $ Function name parameters block
-
-parseTerm :: Parser AST
-parseTerm = label "term" $
-      parens parseExpression
-  <|> parseNumber
-  <|> parseCall
-  <|> parseIdentifier
-
-parseExpression :: Parser AST
-parseExpression = makeExprParser parseTerm operatorTable <?> "Expression"
-
-operatorTable :: [[Operator Parser AST]]
-operatorTable =
-  [ [ prefix "+" id
-    , prefix "!" Not
-    ]
-  , [ binary "*" Multiply
-    , binary "/" Divide
-    ]
-  , [ binary "+" Add
-    , binary "-" Subtract
-    ]
-  , [ binary "==" Equal
-    , binary "!=" NotEqual
-    ]
-  ]
-
-binary :: Text -> (AST -> AST -> AST) -> Operator Parser AST
-binary  name f = InfixL  (f <$ symbol name)
-
-prefix, postfix :: Text -> (AST -> AST) -> Operator Parser AST
-prefix  name f = Prefix  (f <$ symbol name)
-postfix name f = Postfix (f <$ symbol name)

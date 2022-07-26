@@ -102,3 +102,4 @@ test-suite typescript-test
     , text
     , typescript
     , PyF
+    , megaparsec
