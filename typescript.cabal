@@ -56,31 +56,30 @@ common common-rts-options
   ghc-options: -rtsopts -threaded -with-rtsopts=-N
 
 library
-  import:           common-extensions
-  import:           common-ghc-options
+  import:          common-extensions
+  import:          common-ghc-options
   exposed-modules:
+    ASM
+    AST
     Lexer
     Parser
-    AST
-    ASM
 
   build-depends:
     , base
     , megaparsec
-    , text
-    , text-display
     , parser-combinators
     , PyF
+    , text
     , text-display
     , transformers
 
-  hs-source-dirs:   src
+  hs-source-dirs:  src
 
 executable typescript
-  import:           common-extensions
-  import:           common-ghc-options
-  import:           common-rts-options
-  main-is:          Main.hs
+  import:         common-extensions
+  import:         common-ghc-options
+  import:         common-rts-options
+  main-is:        Main.hs
 
   -- other-modules:
   -- other-extensions:
@@ -88,22 +87,22 @@ executable typescript
     , base
     , typescript
 
-  hs-source-dirs:   app
+  hs-source-dirs: app
 
 test-suite typescript-test
-  import:           common-extensions
-  import:           common-ghc-options
-  import:           common-rts-options
-  type:             exitcode-stdio-1.0
-  hs-source-dirs:   test
-  main-is:          Main.hs
+  import:         common-extensions
+  import:         common-ghc-options
+  import:         common-rts-options
+  type:           exitcode-stdio-1.0
+  hs-source-dirs: test
+  main-is:        Main.hs
   build-depends:
-      base
-    , tasty-hunit
+    , base
+    , bytestring
+    , megaparsec
+    , PyF
     , tasty
+    , tasty-golden
+    , tasty-hunit
     , text
     , typescript
-    , PyF
-    , megaparsec
-    , tasty-golden
-    , bytestring

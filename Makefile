@@ -18,7 +18,7 @@ lint: ## Run the code linter (HLint)
 	@cabal-fmt -i *.cabal
 
 style: ## Run the code styler (stylish-haskell)
-	@find test src example -name "*.hs" | xargs -P $(PROCS) -I {} fourmolu -q --mode inplace {}
+	@find test src -name "*.hs" | xargs -P $(PROCS) -I {} fourmolu -q --mode inplace {}
 
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.* ?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'

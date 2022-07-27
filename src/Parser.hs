@@ -1,28 +1,29 @@
 {-# OPTIONS_GHC -Wno-unused-imports #-}
+
 module Parser where
 
 import Control.Monad.Combinators.Expr
+import Data.Text (Text)
+import qualified Data.Text as T
+import Data.Void (Void)
 import Text.Megaparsec
 import Text.Megaparsec.Char
-import Data.Text (Text)
-import Data.Void (Void)
-import qualified Data.Text                      as T
 import qualified Text.Megaparsec.Char.Lexer as L
 
-import Lexer
 import AST
+import Lexer
 
 parseLine :: Text -> Either String AST
 parseLine input =
   case runParser (statements <* eof) "<line>" input of
-      Left eb -> Left $ errorBundlePretty eb
-      Right ast -> Right ast
+    Left eb -> Left $ errorBundlePretty eb
+    Right ast -> Right ast
 
 parse :: forall a. (Show a) => Parser a -> Text -> IO ()
 parse parser input =
   case runParser parser "<line>" input of
-      Left eb -> putStrLn $ errorBundlePretty eb
-      Right result -> print result
+    Left eb -> putStrLn $ errorBundlePretty eb
+    Right result -> print result
 
 -- nonAlphaNumTokens :: [Token Text]
 -- nonAlphaNumTokens = "!?¡¿$€%&|*×÷+-/:<=>@^_~"
@@ -37,7 +38,7 @@ keyword :: Text -> Parser ()
 keyword w = string w *> notFollowedBy alphaNumChar *> consumeSpaces
 
 rws :: [Text] -- list of reserved words
-rws = ["if","then","else","while","true","false"]
+rws = ["if", "then", "else", "while", "true", "false"]
 
 -----------------------
 -- ┌───────────────┐ --
@@ -50,10 +51,11 @@ parseTextIdentifier :: Parser Text
 parseTextIdentifier =
   (lexeme . try) (identifierParser >>= check)
   where
-    check  :: Text -> Parser Text
-    check x = if x `elem` rws
-              then fail $ "Keyword " <> show x <> " cannot be an identifier"
-              else pure x
+    check :: Text -> Parser Text
+    check x =
+      if x `elem` rws
+        then fail $ "Keyword " <> show x <> " cannot be an identifier"
+        else pure x
 
     identifierParser :: Parser Text
     identifierParser = do
@@ -74,15 +76,16 @@ parseCall = label "call" $ do
   callee <- parseTextIdentifier
   args <- parens (parseExpression `sepBy` comma)
   if callee == "assert"
-  then pure $ Assert (head args)
-  else pure $ Call callee args
+    then pure $ Assert (head args)
+    else pure $ Call callee args
 
 parseTerm :: Parser Expr
-parseTerm = label "term" $
-      parseNumber
-  <|> try parseCall
-  <|> parseIdentifier
-  <|> parens parseExpression
+parseTerm =
+  label "term" $
+    parseNumber
+      <|> try parseCall
+      <|> parseIdentifier
+      <|> parens parseExpression
 
 parseExpression :: Parser Expr
 parseExpression = makeExprParser parseTerm operatorTable <?> "Expression"
@@ -102,14 +105,14 @@ statements = do
 
 parseStatement :: Parser AST
 parseStatement =
-      (parseReturn             <?> "Return")
-  <|> (parseFunctionStatement  <?> "Function")
-  <|> (parseIfStatement <?> "If")
-  <|> (parseWhileStatement <?> "While")
-  <|> (parseVarStatement <?> "Var")
-  <|> try (parseAssignStatement <?> "Assign")
-  <|> (parseBlockStatement <?> "Block")
-  <|> (parseExpressionStatement <?> "Expression")
+  (parseReturn <?> "Return")
+    <|> (parseFunctionStatement <?> "Function")
+    <|> (parseIfStatement <?> "If")
+    <|> (parseWhileStatement <?> "While")
+    <|> (parseVarStatement <?> "Var")
+    <|> try (parseAssignStatement <?> "Assign")
+    <|> (parseBlockStatement <?> "Block")
+    <|> (parseExpressionStatement <?> "Expression")
 
 parseReturn :: Parser AST
 parseReturn = do
@@ -169,5 +172,5 @@ parseFunctionStatement = label "function" $ do
   parameters <- parens (parseTextIdentifier `sepBy` comma)
   block@(Block stmts) <- parseBlockStatement
   if name == "main"
-  then pure $ Main stmts
-  else pure $ Function name parameters block
+    then pure $ Main stmts
+    else pure $ Function name parameters block

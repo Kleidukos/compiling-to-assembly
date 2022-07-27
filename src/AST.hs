@@ -1,11 +1,12 @@
-module AST 
-  ( AST(..)
-  , Expr(..)
+module AST
+  ( AST (..)
+  , Expr (..)
   , operatorTable
-  ) where
+  )
+where
 
-import Data.Text (Text)
 import Control.Monad.Combinators.Expr
+import Data.Text (Text)
 import Lexer
 
 data Expr
@@ -30,28 +31,32 @@ data AST
   | Function Text [Text] AST
   | Main [AST]
   | Var Text Expr
-  | Assign Text Expr 
+  | Assign Text Expr
   | While Expr AST
   deriving stock (Eq, Ord, Show)
 
 operatorTable :: [[Operator Parser Expr]]
 operatorTable =
-  [ [ --prefix "+" id
-     prefix "!" Not
+  [
+    [ -- prefix "+" id
+      prefix "!" Not
     ]
-  , [ binary "*" Multiply
+  ,
+    [ binary "*" Multiply
     , binary "/" Divide
     ]
-  , [ binary "+" Add
+  ,
+    [ binary "+" Add
     , binary "-" Subtract
     ]
-  , [ binary "==" Equal
+  ,
+    [ binary "==" Equal
     , binary "!=" NotEqual
     ]
   ]
 
 binary :: Text -> (Expr -> Expr -> Expr) -> Operator Parser Expr
-binary name f = InfixL  (f <$ symbol name)
+binary name f = InfixL (f <$ symbol name)
 
 prefix :: Text -> (Expr -> Expr) -> Operator Parser Expr
-prefix name f = Prefix  (f <$ symbol name)
+prefix name f = Prefix (f <$ symbol name)

@@ -1,10 +1,10 @@
 module Lexer where
 
-import Data.Text                      ( Text )
+import Data.Text (Text)
 import Data.Void
 import Text.Megaparsec (Parsec, between, (<?>))
 import Text.Megaparsec.Char (space1)
-import qualified Text.Megaparsec.Char.Lexer    as L
+import qualified Text.Megaparsec.Char.Lexer as L
 
 type Parser = Parsec Void Text
 
