@@ -10,20 +10,26 @@ import Data.ByteString.Lazy (ByteString)
 
 import Parser
 import AST
-import ASM (emit, newCodeGenEnv)
+import ASM
 import Data.Text.Lazy.Encoding (encodeUtf8)
 import qualified Data.Text.Lazy as Text
 
 main :: IO ()
 main = do
   hSetBuffering stdout LineBuffering
+  let diffCmd ref new = ["delta", "--diff-so-fancy", "--paging=never", ref, new]
   defaultMain $ testGroup "Tests"
     [ testCase "Parsing" parseFactorialTest
-    , goldenVsStringDiff "Emit empty Main"              (\ref new -> ["delta", ref, new]) "./test/golden/asm/empty-main.s" emitEmptyMainTest
-    , goldenVsStringDiff "Emit assert"                  (\ref new -> ["delta", ref, new]) "./test/golden/asm/assert.s" emitAssertTest
-    , goldenVsStringDiff "Emit assert + negation"       (\ref new -> ["delta", ref, new]) "./test/golden/asm/assert-negation.s" emitAssertNegationTest
-    , goldenVsStringDiff "Emit block + infix operators" (\ref new -> ["delta", ref, new]) "./test/golden/asm/block-and-infix.s" emitBlockAndInfixTest
-    , goldenVsStringDiff "Emit if and labels"           (\ref new -> ["delta", ref, new]) "./test/golden/asm/if-and-labels.s" emitIfAndLabelsTest
+    , goldenVsStringDiff "Emit empty Main" diffCmd
+                          "./test/golden/asm/empty-main.s" emitEmptyMainTest
+    , goldenVsStringDiff "Emit assert" diffCmd
+                         "./test/golden/asm/assert.s" emitAssertTest
+    , goldenVsStringDiff "Emit assert + negation" diffCmd
+                         "./test/golden/asm/assert-negation.s" emitAssertNegationTest
+    , goldenVsStringDiff "Emit block + infix operators" diffCmd
+                         "./test/golden/asm/block-and-infix.s" emitBlockAndInfixTest
+    , goldenVsStringDiff "Emit if and labels" diffCmd
+                         "./test/golden/asm/if-and-labels.s" emitIfAndLabelsTest
     ]
 
 parseFactorialTest :: Assertion
@@ -52,12 +58,11 @@ parseFactorialTest = do
 
 emitEmptyMainTest :: IO ByteString
 emitEmptyMainTest = do
-  let env = newCodeGenEnv
-  pure $ encodeUtf8 $ Text.fromStrict $ emit env (Main [])
+  generated <- runCodeGen (emit (Main []))
+  pure . encodeUtf8 . Text.fromStrict $ generated
 
 emitAssertTest :: IO ByteString
 emitAssertTest = do
-  let env = newCodeGenEnv
   parsed <- assertRight $ parseLine [str|
     function main() {
       assert(1);
@@ -69,11 +74,10 @@ emitAssertTest = do
         ]
 
       ]
-  pure $ encodeUtf8 $ Text.fromStrict $ emit env parsed
+  encodeUtf8 . Text.fromStrict <$> runCodeGen (emit parsed)
 
 emitAssertNegationTest :: IO ByteString
 emitAssertNegationTest = do
-  let env = newCodeGenEnv
   parsed <- assertRight $ parseLine [str|
     function main() {
       assert(1);
@@ -87,11 +91,11 @@ emitAssertNegationTest = do
        , ExprStmt (Assert (Not (Number 0)))
        ]
      ]
-  pure $ encodeUtf8 $ Text.fromStrict $ emit env parsed
+  generated <- runCodeGen (emit parsed)
+  pure . encodeUtf8 . Text.fromStrict $ generated
 
 emitBlockAndInfixTest :: IO ByteString
 emitBlockAndInfixTest = do
-  let env = newCodeGenEnv
   parsed <- assertRight $ parseLine [str|
     function main() {
       assert(1);
@@ -120,11 +124,11 @@ emitBlockAndInfixTest = do
           ]
       ]
     ]
-  pure $ encodeUtf8 $ Text.fromStrict $ emit env parsed
+  generated <- runCodeGen (emit parsed)
+  pure . encodeUtf8 . Text.fromStrict $ generated
 
 emitIfAndLabelsTest :: IO ByteString
 emitIfAndLabelsTest = do
-  let env = newCodeGenEnv
   parsed <- assertRight $ parseLine [str|
     if (1) { 
       assert(1);
@@ -146,7 +150,8 @@ emitIfAndLabelsTest = do
          (Block [ExprStmt (Assert (Number 0))])
          (Block [ExprStmt (Assert (Number 1))])
     ]
-  pure $ encodeUtf8 $ Text.fromStrict $ emit env parsed
+  generated <- runCodeGen (emit parsed)
+  pure . encodeUtf8 . Text.fromStrict $ generated
 
 assertRight :: HasCallStack => Either b a -> IO a
 assertRight (Left _a) = assertFailure "Test returned Left instead of Right"

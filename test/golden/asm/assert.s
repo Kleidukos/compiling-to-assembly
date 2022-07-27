@@ -2,7 +2,7 @@
 .global main
 main:
   push {fp, lr}
-  
+ 
   ldr r0, =1
   cmp r0, #1
   moveq r0, #'.'
