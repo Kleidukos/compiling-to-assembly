@@ -66,6 +66,7 @@ library
 
   build-depends:
     , base
+    , containers
     , megaparsec
     , parser-combinators
     , PyF
@@ -99,6 +100,7 @@ test-suite typescript-test
   build-depends:
     , base
     , bytestring
+    , containers
     , megaparsec
     , PyF
     , tasty

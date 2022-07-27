@@ -20,7 +20,6 @@ data Expr
   | Multiply Expr Expr
   | Divide Expr Expr
   | Call Text [Expr]
-  | Assert Expr
   deriving stock (Eq, Ord, Show)
 
 data AST
@@ -29,7 +28,6 @@ data AST
   | Block [AST]
   | If Expr AST AST
   | Function Text [Text] AST
-  | Main [AST]
   | Var Text Expr
   | Assign Text Expr
   | While Expr AST

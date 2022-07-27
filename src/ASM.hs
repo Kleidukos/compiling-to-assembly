@@ -1,27 +1,31 @@
-{-|
+{-# LANGUAGE QuasiQuotes #-}
+
+{- |
 
    1 ~ True
    0 ~ False
 
-|-}
-{-# LANGUAGE QuasiQuotes #-}
-
+|
+-}
 module ASM where
 
 import Control.Concurrent.MVar (MVar)
 import qualified Control.Concurrent.MVar as MVar
+import Control.Monad.IO.Class (liftIO)
+import Control.Monad.Trans.Reader (ReaderT (runReaderT), ask)
 import Data.Foldable (foldMap')
+import Data.Map (Map)
+import qualified Data.Map as Map
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Data.Text.Display
 import PyF
 
 import AST
-import Control.Monad.IO.Class (liftIO)
-import Control.Monad.Trans.Reader (ReaderT (runReaderT), ask)
 
 data CodeGenEnv = CodeGenEnv
   { labelCounter :: Word
+  , locals :: Map Text Int
   }
   deriving stock (Eq, Ord, Show)
 
@@ -30,10 +34,15 @@ type CodeGenM a = ReaderT (MVar CodeGenEnv) IO a
 getNextLabel :: CodeGenM Text
 getNextLabel = do
   envMVar <- ask
-  liftIO $ MVar.modifyMVar envMVar (\CodeGenEnv{labelCounter = lc} -> pure (CodeGenEnv{labelCounter = lc + 1}, Text.pack (".L" <> show lc)))
+  liftIO $
+    MVar.modifyMVar
+      envMVar
+      ( \CodeGenEnv{labelCounter = lc, ..} ->
+          pure (CodeGenEnv{labelCounter = lc + 1, ..}, Text.pack (".L" <> show lc))
+      )
 
 newCodeGenEnv :: IO (MVar CodeGenEnv)
-newCodeGenEnv = MVar.newMVar (CodeGenEnv 0)
+newCodeGenEnv = MVar.newMVar (CodeGenEnv{labelCounter = 0, locals = Map.empty})
 
 runCodeGen :: CodeGenM Text -> IO Text
 runCodeGen computation = do
@@ -41,14 +50,14 @@ runCodeGen computation = do
   runReaderT computation env
 
 emit :: AST -> CodeGenM Text
-emit (Main statements) = emitMain statements
 emit (ExprStmt expr) = emitExpr expr
 emit (Block stmts) = emitBlock stmts
 emit (If condition consequence alternative) = emitIf condition consequence alternative
+emit (Function name arguments body) = emitFunction name arguments body
+emit (Return body) = emitReturn body
 emit _ = undefined
 
 emitExpr :: Expr -> CodeGenM Text
-emitExpr (Assert condition) = emitAssert condition
 emitExpr (Number i) = emitNumber i
 emitExpr (Not term) = emitNot term
 emitExpr (Add left right) = emitAdd left right
@@ -58,7 +67,7 @@ emitExpr (Divide left right) = emitDivide left right
 emitExpr (Equal left right) = emitEqual left right
 emitExpr (NotEqual left right) = emitNotEqual left right
 emitExpr (Call callee arguments) = emitCall callee arguments
-emitExpr _ = undefined
+emitExpr (Identifier identifier) = emitIdentifier identifier
 
 emitNumber :: Integer -> CodeGenM Text
 emitNumber i =
@@ -68,7 +77,8 @@ emitNot :: Expr -> CodeGenM Text
 emitNot term = do
   renderedTerm <- emitExpr term
   pure
-    [fmt|  {renderedTerm}
+    [fmt|
+  {renderedTerm}
   cmp r0, #0
   moveq r0, #1
   movne r0, #0|]
@@ -183,7 +193,7 @@ emitCallN callee arguments = do
 
 emitCallArguments :: [Expr] -> CodeGenM Text
 emitCallArguments arguments = do
-  args <- ifor arguments $ \index arg -> do
+  args <- iforM arguments $ \index arg -> do
     argExpr <- emitExpr arg
     pure $
       foldMap'
@@ -193,23 +203,18 @@ emitCallArguments arguments = do
         ]
   pure $ Text.unlines args
 
-emitMain :: [AST] -> CodeGenM Text
-emitMain statements = do
-  renderedStatements <- mconcat <$> traverse emit statements
-  pure
-    [fmt|
-.global main
-main:
-  push {{fp, lr}}
-{renderedStatements}
-  mov r0, #0
-  pop {{fp, pc}}
-|]
+emitIdentifier :: Text -> CodeGenM Text
+emitIdentifier identifier = do
+  env <- liftIO . MVar.readMVar =<< ask
+  case Map.lookup identifier (locals env) of
+    Nothing -> pure $ error "Undefined variable: " <> identifier
+    Just offset -> pure [fmt|ldr r0, [fp, #{offset}]|]
 
 emitAssert :: Expr -> CodeGenM Text
 emitAssert condition = do
   conditionExpr <- emitExpr condition
-  pure [fmt|{conditionExpr}
+  pure
+    [fmt|{conditionExpr}
   cmp r0, #1
   moveq r0, #'.'
   movne r0, #'F'
@@ -219,12 +224,6 @@ emitAssert condition = do
 emitBlock :: [AST] -> CodeGenM Text
 emitBlock stmts = mconcat <$> traverse emit stmts
 
-ifor :: [a] -> (Int -> a -> CodeGenM b) -> CodeGenM [b]
-ifor list fun = go ilist
-  where
-    ilist = zip [0 ..] list
-    go l = mapM (uncurry fun) l
-
 emitIf :: Expr -> AST -> AST -> CodeGenM Text
 emitIf conditional consequence alternative = do
   ifFalseLabel <- getNextLabel
@@ -233,7 +232,8 @@ emitIf conditional consequence alternative = do
   consequenceStmt <- emit consequence
   alternativeStmt <- emit alternative
 
-  pure [fmt|
+  pure
+    [fmt|
   // conditional
   {conditionalExpr}
   // is the conditional false?
@@ -252,3 +252,65 @@ emitIf conditional consequence alternative = do
 // end of conditional
 {endIfLabel}:
 |]
+
+emitFunction :: Text -> [Text] -> AST -> CodeGenM Text
+emitFunction name arguments body
+  | length arguments > 4 = error "More than 4 arguments is not supported!"
+  | otherwise = emitFunction4 name arguments body
+
+emitFunction4 :: Text -> [Text] -> AST -> CodeGenM Text
+emitFunction4 name arguments body = do
+  let prologue = emitPrologue
+  let epilogue = emitEpilogue
+  newLocals <- setupNewLocals arguments
+  envMVar <- ask
+  liftIO $
+    MVar.modifyMVar_
+      envMVar
+      ( \CodeGenEnv{labelCounter = lc} ->
+          pure CodeGenEnv{labelCounter = lc, locals = newLocals}
+      )
+  renderedBody <- emit body
+  pure
+    [fmt|
+.global {name}
+{name}:
+{prologue}
+{renderedBody}
+{epilogue}
+|]
+
+emitPrologue :: Text
+emitPrologue =
+  [fmt|
+  push {{fp, lr}}
+  mov fp, sp
+  push {{r0, r1, r2, r3}}|]
+
+emitEpilogue :: Text
+emitEpilogue =
+  [fmt|
+  mov sp, fp
+  mov r0, #0
+  pop {{fp, pc}}|]
+
+setupNewLocals :: [Text] -> CodeGenM (Map Text Int)
+setupNewLocals arguments = do
+  locals <- iforM arguments $ \index arg -> pure (arg, 4 * index - 16)
+  pure $ Map.fromList locals
+
+emitReturn :: Expr -> CodeGenM Text
+emitReturn body = do
+  renderedBody <- emitExpr body
+  pure
+    [fmt|
+  {renderedBody}
+  mov sp, fp
+  pop {{fp, pc}}
+|]
+
+iforM :: [a] -> (Int -> a -> CodeGenM b) -> CodeGenM [b]
+iforM list fun = go ilist
+  where
+    ilist = zip [0 ..] list
+    go l = mapM (uncurry fun) l

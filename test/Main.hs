@@ -81,7 +81,7 @@ parseFactorialTest = do
 
 emitEmptyMainTest :: IO ByteString
 emitEmptyMainTest = do
-  generated <- runCodeGen (emit (Main []))
+  generated <- runCodeGen (emit (Function "main" [] $ Block []))
   pure . encodeUtf8 . Text.fromStrict $ generated
 
 emitAssertTest :: IO ByteString
@@ -90,15 +90,34 @@ emitAssertTest = do
     assertRight $
       parseLine
         [str|
+    function assert(x) {
+      if (x) {  
+        putchar(46);
+      } else { 
+        putchar(70);
+      }
+    }
+
     function main() {
       assert(1);
     }
 |]
   parsed
     @?= Block
-      [ Main
-          [ ExprStmt (Assert (Number 1))
-          ]
+      [ Function
+          "assert"
+          ["x"]
+          ( Block
+              [ If
+                  (Identifier "x")
+                  (Block [ExprStmt (Call "putchar" [Number 46])])
+                  (Block [ExprStmt (Call "putchar" [Number 70])])
+              ]
+          )
+      , Function
+          "main"
+          []
+          (Block [ExprStmt (Call "assert" [Number 1])])
       ]
   encodeUtf8 . Text.fromStrict <$> runCodeGen (emit parsed)
 
@@ -108,6 +127,14 @@ emitAssertNegationTest = do
     assertRight $
       parseLine
         [str|
+    function assert(x) {
+      if (x) {  
+        putchar(46);
+      } else { 
+        putchar(70);
+      }
+    }
+
     function main() {
       assert(1);
       assert(!0);
@@ -116,10 +143,21 @@ emitAssertNegationTest = do
 
   parsed
     @?= Block
-      [ Main
-          [ ExprStmt (Assert (Number 1))
-          , ExprStmt (Assert (Not (Number 0)))
-          ]
+      [ Function
+          "assert"
+          ["x"]
+          ( Block
+              [ If
+                  (Identifier "x")
+                  (Block [ExprStmt (Call "putchar" [Number 46])])
+                  (Block [ExprStmt (Call "putchar" [Number 70])])
+              ]
+          )
+      , Function "main" [] $
+          Block
+            [ ExprStmt (Call "assert" [Number 1])
+            , ExprStmt (Call "assert" [Not (Number 0)])
+            ]
       ]
   generated <- runCodeGen (emit parsed)
   pure . encodeUtf8 . Text.fromStrict $ generated
@@ -130,6 +168,14 @@ emitBlockAndInfixTest = do
     assertRight $
       parseLine
         [str|
+    function assert(x) {
+      if (x) {  
+        putchar(46);
+      } else { 
+        putchar(70);
+      }
+    }
+
     function main() {
       assert(1);
       assert(!0);
@@ -143,27 +189,36 @@ emitBlockAndInfixTest = do
 
   parsed
     @?= Block
-      [ Main
-          [ ExprStmt (Assert (Number 1))
-          , ExprStmt (Assert (Not (Number 0)))
-          , ExprStmt
-              ( Assert
-                  ( Equal
-                      (Number 42)
-                      ( Add
-                          ( Add
-                              (Number 4)
-                              (Multiply (Number 2) (Subtract (Number 12) (Number 2)))
-                          )
-                          (Multiply (Number 3) (Add (Number 5) (Number 1)))
-                      )
-                  )
-              )
-          , Block
-              [ ExprStmt (Assert (Number 1))
-              , ExprStmt (Assert (Number 1))
+      [ Function
+          "assert"
+          ["x"]
+          ( Block
+              [ If
+                  (Identifier "x")
+                  (Block [ExprStmt (Call "putchar" [Number 46])])
+                  (Block [ExprStmt (Call "putchar" [Number 70])])
               ]
-          ]
+          )
+      , Function
+          "main"
+          []
+          ( Block
+              [ ExprStmt (Call "assert" [Number 1])
+              , ExprStmt (Call "assert" [Not (Number 0)])
+              , ExprStmt
+                  ( Call
+                      "assert"
+                      [ Equal
+                          (Number 42)
+                          ( Add
+                              (Add (Number 4) (Multiply (Number 2) (Subtract (Number 12) (Number 2))))
+                              (Multiply (Number 3) (Add (Number 5) (Number 1)))
+                          )
+                      ]
+                  )
+              , Block [ExprStmt (Call "assert" [Number 1]), ExprStmt (Call "assert" [Number 1])]
+              ]
+          )
       ]
   generated <- runCodeGen (emit parsed)
   pure . encodeUtf8 . Text.fromStrict $ generated
@@ -174,6 +229,14 @@ emitIfAndLabelsTest = do
     assertRight $
       parseLine
         [str|
+    function assert(x) {
+      if (x) {  
+        putchar(46);
+      } else { 
+        putchar(70);
+      }
+    }
+
     function main() {
       if (1) { 
         assert(1);
@@ -190,17 +253,28 @@ emitIfAndLabelsTest = do
 
   parsed
     @?= Block
-    [Main 
-      [ If
-          (Number 1)
-          (Block [ExprStmt (Assert (Number 1))])
-          (Block [ExprStmt (Assert (Number 0))])
-      , If
-          (Number 0)
-          (Block [ExprStmt (Assert (Number 0))])
-          (Block [ExprStmt (Assert (Number 1))])
+      [ Function
+          "assert"
+          ["x"]
+          ( Block
+              [ If
+                  (Identifier "x")
+                  (Block [ExprStmt (Call "putchar" [Number 46])])
+                  (Block [ExprStmt (Call "putchar" [Number 70])])
+              ]
+          )
+      , Function "main" [] $
+          Block
+            [ If
+                (Number 1)
+                (Block [ExprStmt (Call "assert" [Number 1])])
+                (Block [ExprStmt (Call "assert" [Number 0])])
+            , If
+                (Number 0)
+                (Block [ExprStmt (Call "assert" [Number 0])])
+                (Block [ExprStmt (Call "assert" [Number 1])])
+            ]
       ]
-    ]
   generated <- runCodeGen (emit parsed)
   pure . encodeUtf8 . Text.fromStrict $ generated
 

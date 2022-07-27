@@ -75,9 +75,7 @@ parseCall :: Parser Expr
 parseCall = label "call" $ do
   callee <- parseTextIdentifier
   args <- parens (parseExpression `sepBy` comma)
-  if callee == "assert"
-    then pure $ Assert (head args)
-    else pure $ Call callee args
+  pure $ Call callee args
 
 parseTerm :: Parser Expr
 parseTerm =
@@ -170,7 +168,5 @@ parseFunctionStatement = label "function" $ do
   keyword "function"
   name <- parseTextIdentifier
   parameters <- parens (parseTextIdentifier `sepBy` comma)
-  block@(Block stmts) <- parseBlockStatement
-  if name == "main"
-    then pure $ Main stmts
-    else pure $ Function name parameters block
+  body <- parseBlockStatement
+  pure $ Function name parameters body
