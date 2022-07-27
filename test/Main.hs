@@ -12,7 +12,7 @@ import Test.Tasty.HUnit
 import ASM
 import AST
 import qualified Data.Text.Lazy as Text
-import Data.Text.Lazy.Encoding (encodeUtf8)
+import qualified Data.Text.Lazy.Encoding as Text
 import Parser
 
 main :: IO ()
@@ -48,6 +48,16 @@ main = do
           diffCmd
           "./test/golden/asm/if-and-labels.s"
           emitIfAndLabelsTest
+      , goldenVsStringDiff
+          "Emit Var"
+          diffCmd
+          "./test/golden/asm/var.s"
+          emitVarTest
+      , goldenVsStringDiff
+          "While"
+          diffCmd
+          "./test/golden/asm/while.s"
+          emitWhileTest
       ]
 
 parseFactorialTest :: Assertion
@@ -82,7 +92,7 @@ parseFactorialTest = do
 emitEmptyMainTest :: IO ByteString
 emitEmptyMainTest = do
   generated <- runCodeGen (emit (Function "main" [] $ Block []))
-  pure . encodeUtf8 . Text.fromStrict $ generated
+  pure . Text.encodeUtf8 . Text.fromStrict $ generated
 
 emitAssertTest :: IO ByteString
 emitAssertTest = do
@@ -119,7 +129,7 @@ emitAssertTest = do
           []
           (Block [ExprStmt (Call "assert" [Number 1])])
       ]
-  encodeUtf8 . Text.fromStrict <$> runCodeGen (emit parsed)
+  Text.encodeUtf8 . Text.fromStrict <$> runCodeGen (emit parsed)
 
 emitAssertNegationTest :: IO ByteString
 emitAssertNegationTest = do
@@ -160,7 +170,7 @@ emitAssertNegationTest = do
             ]
       ]
   generated <- runCodeGen (emit parsed)
-  pure . encodeUtf8 . Text.fromStrict $ generated
+  pure . Text.encodeUtf8 . Text.fromStrict $ generated
 
 emitBlockAndInfixTest :: IO ByteString
 emitBlockAndInfixTest = do
@@ -221,7 +231,7 @@ emitBlockAndInfixTest = do
           )
       ]
   generated <- runCodeGen (emit parsed)
-  pure . encodeUtf8 . Text.fromStrict $ generated
+  pure . Text.encodeUtf8 . Text.fromStrict $ generated
 
 emitIfAndLabelsTest :: IO ByteString
 emitIfAndLabelsTest = do
@@ -276,7 +286,113 @@ emitIfAndLabelsTest = do
             ]
       ]
   generated <- runCodeGen (emit parsed)
-  pure . encodeUtf8 . Text.fromStrict $ generated
+  pure . Text.encodeUtf8 . Text.fromStrict $ generated
+
+emitVarTest :: IO ByteString
+emitVarTest = do
+  parsed <-
+    assertRight $
+      parseLine
+        [str|
+    function assert(x) {
+      if (x) {  
+        putchar(46);
+      } else { 
+        putchar(70);
+      }
+    }
+
+    function main() {
+      var x = 4 + 2 * (12 - 2);
+      var y = 3 * (5 + 1);
+      var z = x + y;
+      assert(z == 42);
+    }
+|]
+  parsed
+    @?= Block
+      [ Function
+          "assert"
+          ["x"]
+          ( Block
+              [ If
+                  (Identifier "x")
+                  (Block [ExprStmt (Call "putchar" [Number 46])])
+                  (Block [ExprStmt (Call "putchar" [Number 70])])
+              ]
+          )
+      , Function
+          "main"
+          []
+          ( Block
+              [ Var "x" (Add (Number 4) (Multiply (Number 2) (Subtract (Number 12) (Number 2))))
+              , Var
+                  "y"
+                  ( Multiply
+                      (Number 3)
+                      (Add (Number 5) (Number 1))
+                  )
+              , Var "z" (Add (Identifier "x") (Identifier "y"))
+              , ExprStmt (Call "assert" [Equal (Identifier "z") (Number 42)])
+              ]
+          )
+      ]
+  generated <- runCodeGen (emit parsed)
+  pure . Text.encodeUtf8 . Text.fromStrict $ generated
+
+emitWhileTest :: IO ByteString
+emitWhileTest = do
+  parsed <-
+    assertRight $
+      parseLine
+        [str|
+    function assert(x) {
+      if (x) {  
+        putchar(46);
+      } else { 
+        putchar(70);
+      }
+    }
+
+    function main() {
+      var i = 0;
+      while (i != 3) {
+        i = i+ 1;
+      }
+      putchar(i);
+      assert(i == 3);
+    }
+|]
+  parsed
+    @?= Block
+      [ Function
+          "assert"
+          ["x"]
+          ( Block
+              [ If
+                  (Identifier "x")
+                  (Block [ExprStmt (Call "putchar" [Number 46])])
+                  (Block [ExprStmt (Call "putchar" [Number 70])])
+              ]
+          )
+      , Function
+          "main"
+          []
+          ( Block
+              [ Var "i" (Number 0)
+              , While
+                  (NotEqual (Identifier "i") (Number 3))
+                  ( Block
+                      [ Assign "i" (Add (Identifier "i") (Number 1)) ]
+                  )
+              , ExprStmt $ Call "putchar" [Identifier "i"]
+              , ExprStmt $ Call "assert" [Equal (Identifier "i") (Number 3)]
+              ]
+          )
+      ]
+
+  generated <- runCodeGen (emit parsed)
+  pure . Text.encodeUtf8 . Text.fromStrict $ generated
 
 assertRight :: HasCallStack => Either b a -> IO a
 assertRight (Left _a) = assertFailure "Test returned Left instead of Right"

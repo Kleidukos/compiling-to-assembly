@@ -1,11 +1,8 @@
 {-# LANGUAGE QuasiQuotes #-}
 
-{- |
-
+{-
    1 ~ True
    0 ~ False
-
-|
 -}
 module ASM where
 
@@ -26,8 +23,29 @@ import AST
 data CodeGenEnv = CodeGenEnv
   { labelCounter :: Word
   , locals :: Map Text Int
+  , nextLocalOffset :: Int
   }
   deriving stock (Eq, Ord, Show)
+
+setOffset :: Text -> CodeGenM ()
+setOffset name = do
+  envMVar <- ask
+  liftIO $
+    MVar.modifyMVar_
+      envMVar
+      ( \CodeGenEnv{locals, nextLocalOffset, ..} -> do
+          let newOffset = nextLocalOffset - 4
+          let newNextLocalOffset = nextLocalOffset - 8
+          let newLocals = Map.insert name newOffset locals
+          pure CodeGenEnv{locals = newLocals, nextLocalOffset = newNextLocalOffset, ..}
+      )
+
+getOffset :: Text -> CodeGenM Int
+getOffset name = do
+  env <- liftIO . MVar.readMVar =<< ask
+  case Map.lookup name (locals env) of
+    Nothing -> pure $ error (Text.unpack $ "Undefined variable: " <> name)
+    Just offset -> pure offset
 
 type CodeGenM a = ReaderT (MVar CodeGenEnv) IO a
 
@@ -42,7 +60,7 @@ getNextLabel = do
       )
 
 newCodeGenEnv :: IO (MVar CodeGenEnv)
-newCodeGenEnv = MVar.newMVar (CodeGenEnv{labelCounter = 0, locals = Map.empty})
+newCodeGenEnv = MVar.newMVar (CodeGenEnv{labelCounter = 0, locals = Map.empty, nextLocalOffset = -20})
 
 runCodeGen :: CodeGenM Text -> IO Text
 runCodeGen computation = do
@@ -55,7 +73,9 @@ emit (Block stmts) = emitBlock stmts
 emit (If condition consequence alternative) = emitIf condition consequence alternative
 emit (Function name arguments body) = emitFunction name arguments body
 emit (Return body) = emitReturn body
-emit _ = undefined
+emit (Var name value) = emitVar name value
+emit (While condition body) = emitWhile condition body
+emit (Assign var content) = emitAssign var content
 
 emitExpr :: Expr -> CodeGenM Text
 emitExpr (Number i) = emitNumber i
@@ -137,10 +157,13 @@ emitEqual left right = do
   rightExpr <- emitExpr right
   pure
     [fmt|
+  // left expression
   {leftExpr}
   push {{r0, ip}}
+  // right expression
   {rightExpr}
   pop {{r1, ip}}
+  // left == right ?
   cmp r0, r1
   moveq r0, #1
   movne r0, #0|]
@@ -161,8 +184,7 @@ emitNotEqual left right = do
 
 emitCall :: Text -> [Expr] -> CodeGenM Text
 emitCall callee arguments
-  | null arguments = do
-      pure [fmt|  bl {callee}|]
+  | null arguments = pure [fmt|  bl {callee}|]
   | length arguments == 1 = emitCall1 callee (head arguments)
   | length arguments >= 2 && length arguments <= 4 = emitCallN callee arguments
   | otherwise = error "More than 4 arguments are not supported!"
@@ -207,7 +229,7 @@ emitIdentifier :: Text -> CodeGenM Text
 emitIdentifier identifier = do
   env <- liftIO . MVar.readMVar =<< ask
   case Map.lookup identifier (locals env) of
-    Nothing -> pure $ error "Undefined variable: " <> identifier
+    Nothing -> pure $ error (Text.unpack $ "Undefined variable: " <> identifier)
     Just offset -> pure [fmt|ldr r0, [fp, #{offset}]|]
 
 emitAssert :: Expr -> CodeGenM Text
@@ -267,8 +289,8 @@ emitFunction4 name arguments body = do
   liftIO $
     MVar.modifyMVar_
       envMVar
-      ( \CodeGenEnv{labelCounter = lc} ->
-          pure CodeGenEnv{labelCounter = lc, locals = newLocals}
+      ( \CodeGenEnv{..} ->
+          pure CodeGenEnv{locals = newLocals, ..}
       )
   renderedBody <- emit body
   pure
@@ -307,6 +329,48 @@ emitReturn body = do
   {renderedBody}
   mov sp, fp
   pop {{fp, pc}}
+|]
+
+emitVar :: Text -> Expr -> CodeGenM Text
+emitVar name value = do
+  renderedValue <- emitExpr value
+  setOffset name
+  pure
+    [fmt|
+  {renderedValue}
+  push {{r0, ip}}
+|]
+
+emitWhile :: Expr -> AST -> CodeGenM Text
+emitWhile condition body = do
+  loopStart <- getNextLabel
+  loopEnd <- getNextLabel
+  renderedCondition <- emitExpr condition
+  renderedBody <- emit body
+  pure
+    [fmt| 
+// loop start
+{loopStart}:
+{renderedCondition} 
+
+  // did we reach the loop-breaking condition?
+  // if yes, branch to {loopEnd}
+  cmp r0, #0
+  beq {loopEnd}
+{renderedBody}
+  b {loopStart}
+// loop end
+{loopEnd}:
+|]
+
+emitAssign :: Text -> Expr -> CodeGenM Text
+emitAssign name value = do
+  renderedValue <- emitExpr value
+  offset <- getOffset name
+  pure
+    [fmt| 
+  {renderedValue}
+  str r0, [fp, #{offset}]
 |]
 
 iforM :: [a] -> (Int -> a -> CodeGenM b) -> CodeGenM [b]

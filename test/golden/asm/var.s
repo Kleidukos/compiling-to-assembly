@@ -42,22 +42,6 @@ main:
   mov fp, sp
   push {r0, r1, r2, r3}
 
-  ldr r0, =1
-  bl assert
-
-  
-  ldr r0, =0
-  cmp r0, #0
-  moveq r0, #1
-  movne r0, #0
-  bl assert
-
-  
-  // left expression
-  ldr r0, =42
-  push {r0, ip}
-  // right expression
-  
   
   ldr r0, =4
   push {r0, ip}
@@ -75,6 +59,7 @@ main:
   pop {r1, ip}
   add r0, r0, r1
   push {r0, ip}
+
   
   ldr r0, =3
   push {r0, ip}
@@ -86,19 +71,27 @@ main:
   add r0, r0, r1
   pop {r1, ip}
   mul r0, r0, r1
+  push {r0, ip}
+
+  
+  ldr r0, [fp, #-24]
+  push {r0, ip}
+  ldr r0, [fp, #-32]
   pop {r1, ip}
   add r0, r0, r1
+  push {r0, ip}
+
+  
+  // left expression
+  ldr r0, [fp, #-40]
+  push {r0, ip}
+  // right expression
+  ldr r0, =42
   pop {r1, ip}
   // left == right ?
   cmp r0, r1
   moveq r0, #1
   movne r0, #0
-  bl assert
-
-  ldr r0, =1
-  bl assert
-
-  ldr r0, =1
   bl assert
 
 
