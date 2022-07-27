@@ -174,20 +174,23 @@ emitIfAndLabelsTest = do
     assertRight $
       parseLine
         [str|
-    if (1) { 
-      assert(1);
-    } else {
-      assert(0);
-    }
-    if (0) {
-      assert(0);
-    } else {
-      assert(1);
+    function main() {
+      if (1) { 
+        assert(1);
+      } else {
+        assert(0);
+      }
+      if (0) {
+        assert(0);
+      } else {
+        assert(1);
+      }
     }
 |]
 
   parsed
     @?= Block
+    [Main 
       [ If
           (Number 1)
           (Block [ExprStmt (Assert (Number 1))])
@@ -197,6 +200,7 @@ emitIfAndLabelsTest = do
           (Block [ExprStmt (Assert (Number 0))])
           (Block [ExprStmt (Assert (Number 1))])
       ]
+    ]
   generated <- runCodeGen (emit parsed)
   pure . encodeUtf8 . Text.fromStrict $ generated
 

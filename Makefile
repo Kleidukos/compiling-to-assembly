@@ -11,7 +11,7 @@ repl: ## Start a REPL
 	@cabal repl
 
 test: ## Run the test suite
-	@cabal test
+	@cabal test --test-show-details direct --test-options="--size-cutoff 50000"
 
 lint: ## Run the code linter (HLint)
 	@find test src -name "*.hs" | xargs -P $(PROCS) -I {} hlint --refactor-options="-i" --refactor {}

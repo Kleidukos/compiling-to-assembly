@@ -1,3 +1,9 @@
+{-|
+
+   1 ~ True
+   0 ~ False
+
+|-}
 {-# LANGUAGE QuasiQuotes #-}
 
 module ASM where
@@ -56,9 +62,7 @@ emitExpr _ = undefined
 
 emitNumber :: Integer -> CodeGenM Text
 emitNumber i =
-  pure
-    [fmt|
-  ldr r0, ={i}|]
+  pure [fmt|ldr r0, ={i}|]
 
 emitNot :: Expr -> CodeGenM Text
 emitNot term = do
@@ -205,8 +209,7 @@ main:
 emitAssert :: Expr -> CodeGenM Text
 emitAssert condition = do
   conditionExpr <- emitExpr condition
-  pure
-    [fmt| {conditionExpr}
+  pure [fmt|{conditionExpr}
   cmp r0, #1
   moveq r0, #'.'
   movne r0, #'F'
@@ -229,21 +232,23 @@ emitIf conditional consequence alternative = do
   conditionalExpr <- emitExpr conditional
   consequenceStmt <- emit consequence
   alternativeStmt <- emit alternative
-  pure
-    [fmt|
+
+  pure [fmt|
   // conditional
   {conditionalExpr}
-  cmp r0, #0
-  // branch to alternative
+  // is the conditional false?
+  cmp r0, #0 
+  // if yes, branch to alternative
   beq {ifFalseLabel}
 
-  // consequence
+  // if no, we go to the consequence
   {consequenceStmt}
+  // and branch to the next block of instructions
   b {endIfLabel}
 
-// alternative
+// alternative (the condition was false)
 {ifFalseLabel}:
 {alternativeStmt}
-
+// end of conditional
 {endIfLabel}:
 |]
