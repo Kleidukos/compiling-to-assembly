@@ -13,6 +13,9 @@ repl: ## Start a REPL
 test: ## Run the test suite
 	@cabal test --test-show-details direct --test-options="--size-cutoff 50000"
 
+regen-golden: ## Re-generate the golden tests
+	@cabal test --test-options="--accept"
+
 lint: ## Run the code linter (HLint)
 	@find test src -name "*.hs" | xargs -P $(PROCS) -I {} hlint --refactor-options="-i" --refactor {}
 	@cabal-fmt -i *.cabal
