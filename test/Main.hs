@@ -23,6 +23,7 @@ main = do
     , goldenVsStringDiff "Emit assert"                  (\ref new -> ["delta", ref, new]) "./test/golden/asm/assert.s" emitAssertTest
     , goldenVsStringDiff "Emit assert + negation"       (\ref new -> ["delta", ref, new]) "./test/golden/asm/assert-negation.s" emitAssertNegationTest
     , goldenVsStringDiff "Emit block + infix operators" (\ref new -> ["delta", ref, new]) "./test/golden/asm/block-and-infix.s" emitBlockAndInfixTest
+    , goldenVsStringDiff "Emit if and labels"           (\ref new -> ["delta", ref, new]) "./test/golden/asm/if-and-labels.s" emitIfAndLabelsTest
     ]
 
 parseFactorialTest :: Assertion
@@ -121,6 +122,31 @@ emitBlockAndInfixTest = do
     ]
   pure $ encodeUtf8 $ Text.fromStrict $ emit env parsed
 
+emitIfAndLabelsTest :: IO ByteString
+emitIfAndLabelsTest = do
+  let env = newCodeGenEnv
+  parsed <- assertRight $ parseLine [str|
+    if (1) { 
+      assert(1);
+    } else {
+      assert(0);
+    }
+    if (0) {
+      assert(0);
+    } else {
+      assert(1);
+    }
+|]
+
+  parsed @?= Block
+    [ If (Number 1)
+         (Block [ExprStmt (Assert (Number 1))])
+         (Block [ExprStmt (Assert (Number 0))])
+    , If (Number 0)
+         (Block [ExprStmt (Assert (Number 0))])
+         (Block [ExprStmt (Assert (Number 1))])
+    ]
+  pure $ encodeUtf8 $ Text.fromStrict $ emit env parsed
 
 assertRight :: HasCallStack => Either b a -> IO a
 assertRight (Left _a) = assertFailure "Test returned Left instead of Right"

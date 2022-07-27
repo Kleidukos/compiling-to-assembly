@@ -177,7 +177,7 @@ emitIf env conditional consequence alternative = [fmt|
   {emit env consequence}
   b {endIfLabel}
 
-//alternative
+// alternative
 {ifFalseLabel}:
 {emit env alternative}
 
