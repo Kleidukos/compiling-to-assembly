@@ -120,6 +120,7 @@ emitCall1 callee argument = [fmt|
   bl {callee}
 |]
 
+-- | This function handles 4 arguments
 -- We compute the memory address of current stack pointer + 16 bytes (4 words)
 -- So that the next four words we push fill this space on the stack
 emitCallN :: Text -> [Expr] -> Text
@@ -166,15 +167,19 @@ ifor list fun = go ilist
 
 emitIf :: MVar CodeGenEnv -> Expr -> AST -> AST -> Text
 emitIf env conditional consequence alternative = [fmt|
+  // conditional
   {emitExpr conditional}
   cmp r0, #0
+  // branch to alternative
   beq {ifFalseLabel}
 
+  // consequence
   {emit env consequence}
   b {endIfLabel}
 
+//alternative
 {ifFalseLabel}:
-{alternative}
+{emit env alternative}
 
 {endIfLabel}:
 |]

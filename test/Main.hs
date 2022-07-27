@@ -5,22 +5,25 @@ import Test.Tasty
 import Test.Tasty.HUnit
 import System.IO
 import PyF
+import Test.Tasty.Golden (goldenVsStringDiff)
+import Data.ByteString.Lazy (ByteString)
 
 import Parser
 import AST
-import ASM (emit)
+import ASM (emit, newCodeGenEnv)
+import Data.Text.Lazy.Encoding (encodeUtf8)
+import qualified Data.Text.Lazy as Text
 
 main :: IO ()
 main = do
   hSetBuffering stdout LineBuffering
   defaultMain $ testGroup "Tests"
     [ testCase "Parsing" parseFactorialTest
-    , testCase "Emit empty Main" emitEmptyMainTest
-    , testCase "Emit assert" emitAssertTest
-    , testCase "Emit assert + negation" emitAssertNegationTest
-    , testCase "Emit block + infix operators" emitBlockAndInfixTest
+    , goldenVsStringDiff "Emit empty Main"              (\ref new -> ["delta", ref, new]) "./test/golden/asm/empty-main.s" emitEmptyMainTest
+    , goldenVsStringDiff "Emit assert"                  (\ref new -> ["delta", ref, new]) "./test/golden/asm/assert.s" emitAssertTest
+    , goldenVsStringDiff "Emit assert + negation"       (\ref new -> ["delta", ref, new]) "./test/golden/asm/assert-negation.s" emitAssertNegationTest
+    , goldenVsStringDiff "Emit block + infix operators" (\ref new -> ["delta", ref, new]) "./test/golden/asm/block-and-infix.s" emitBlockAndInfixTest
     ]
-
 
 parseFactorialTest :: Assertion
 parseFactorialTest = do
@@ -46,21 +49,14 @@ parseFactorialTest = do
         ]
   result @?= Right expected
 
-emitEmptyMainTest :: Assertion
+emitEmptyMainTest :: IO ByteString
 emitEmptyMainTest = do
-      let result = emit (Main [])
-      let expected = [str|
-.global main
-main:
-  push {fp, lr}
+  let env = newCodeGenEnv
+  pure $ encodeUtf8 $ Text.fromStrict $ emit env (Main [])
 
-  mov r0, #0
-  pop {fp, pc}
-|]
-      result @?= expected
-
-emitAssertTest :: Assertion
+emitAssertTest :: IO ByteString
 emitAssertTest = do
+  let env = newCodeGenEnv
   parsed <- assertRight $ parseLine [str|
     function main() {
       assert(1);
@@ -72,24 +68,11 @@ emitAssertTest = do
         ]
 
       ]
-  let emitted = emit parsed
-  emitted @?= [str|
-.global main
-main:
-  push {fp, lr}
-  
-  ldr r0, =1
-  cmp r0, #1
-  moveq r0, #'.'
-  movne r0, #'F'
-  bl putchar
+  pure $ encodeUtf8 $ Text.fromStrict $ emit env parsed
 
-  mov r0, #0
-  pop {fp, pc}
-|]
-
-emitAssertNegationTest :: Assertion
+emitAssertNegationTest :: IO ByteString
 emitAssertNegationTest = do
+  let env = newCodeGenEnv
   parsed <- assertRight $ parseLine [str|
     function main() {
       assert(1);
@@ -103,33 +86,11 @@ emitAssertNegationTest = do
        , ExprStmt (Assert (Not (Number 0)))
        ]
      ]
-  let emitted = emit parsed
-  emitted @?= [str|
-.global main
-main:
-  push {fp, lr}
-  
-  ldr r0, =1
-  cmp r0, #1
-  moveq r0, #'.'
-  movne r0, #'F'
-  bl putchar
-    
-  ldr r0, =0
-  cmp r0, #0
-  moveq r0, #1
-  movne r0, #0
-  cmp r0, #1
-  moveq r0, #'.'
-  movne r0, #'F'
-  bl putchar
+  pure $ encodeUtf8 $ Text.fromStrict $ emit env parsed
 
-  mov r0, #0
-  pop {fp, pc}
-|]
-
-emitBlockAndInfixTest :: Assertion
+emitBlockAndInfixTest :: IO ByteString
 emitBlockAndInfixTest = do
+  let env = newCodeGenEnv
   parsed <- assertRight $ parseLine [str|
     function main() {
       assert(1);
@@ -158,96 +119,10 @@ emitBlockAndInfixTest = do
           ]
       ]
     ]
-  let emitted = emit parsed
-  emitted @?= [str|
-.global main
-main:
-  push {fp, lr}
-  
-  ldr r0, =1
-  cmp r0, #1
-  moveq r0, #'.'
-  movne r0, #'F'
-  bl putchar
-    
-  ldr r0, =0
-  cmp r0, #0
-  moveq r0, #1
-  movne r0, #0
-  cmp r0, #1
-  moveq r0, #'.'
-  movne r0, #'F'
-  bl putchar
-  
-  
-  ldr r0, =42
-  push {r0, ip}
-  
-  
-  
-  ldr r0, =4
-  push {r0, ip}
-  
-  
-  ldr r0, =2
-  push {r0, ip}
-  
-  
-  ldr r0, =12
-  push {r0, ip}
-  
-  ldr r0, =2
-  pop {r1, ip}
-  sub r0, r0, r1
-  pop {r1, ip}
-  mul r0, r0, r1
-  pop {r1, ip}
-  add r0, r0, r1
-  push {r0, ip}
-  
-  
-  ldr r0, =3
-  push {r0, ip}
-  
-  
-  ldr r0, =5
-  push {r0, ip}
-  
-  ldr r0, =1
-  pop {r1, ip}
-  add r0, r0, r1
-  pop {r1, ip}
-  mul r0, r0, r1
-  pop {r1, ip}
-  add r0, r0, r1
-  pop {r1, ip}
-  cmp r0, r1
-  moveq r0, #1
-  movne r0, #0
-  cmp r0, #1
-  moveq r0, #'.'
-  movne r0, #'F'
-  bl putchar
-  
-  ldr r0, =1
-  cmp r0, #1
-  moveq r0, #'.'
-  movne r0, #'F'
-  bl putchar
-  
-  ldr r0, =1
-  cmp r0, #1
-  moveq r0, #'.'
-  movne r0, #'F'
-  bl putchar
-
-  mov r0, #0
-  pop {fp, pc}
-|]
+  pure $ encodeUtf8 $ Text.fromStrict $ emit env parsed
 
 
 assertRight :: HasCallStack => Either b a -> IO a
 assertRight (Left _a) = assertFailure "Test returned Left instead of Right"
 assertRight (Right b) = pure b
-
 
