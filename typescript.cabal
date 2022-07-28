@@ -68,6 +68,7 @@ library
     , base
     , containers
     , megaparsec
+    , ordered-containers
     , parser-combinators
     , PyF
     , text
@@ -81,9 +82,6 @@ executable typescript
   import:         common-ghc-options
   import:         common-rts-options
   main-is:        Main.hs
-
-  -- other-modules:
-  -- other-extensions:
   build-depends:
     , base
     , typescript
@@ -97,6 +95,11 @@ test-suite typescript-test
   type:           exitcode-stdio-1.0
   hs-source-dirs: test
   main-is:        Main.hs
+  other-modules:
+    ASMTest
+    ParserTest
+    Utils
+
   build-depends:
     , base
     , bytestring
@@ -108,3 +111,4 @@ test-suite typescript-test
     , tasty-hunit
     , text
     , typescript
+    , ordered-containers

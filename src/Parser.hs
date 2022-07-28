@@ -3,6 +3,8 @@
 module Parser where
 
 import Control.Monad.Combinators.Expr
+import Data.Functor (($>))
+import qualified Data.Map.Ordered.Strict as OMap
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Void (Void)
@@ -12,7 +14,6 @@ import qualified Text.Megaparsec.Char.Lexer as L
 
 import AST
 import Lexer
-import Data.Functor (($>))
 
 parseLine :: Text -> Either String AST
 parseLine input =
@@ -37,6 +38,9 @@ parse parser input =
 
 keyword :: Text -> Parser ()
 keyword w = string w *> notFollowedBy alphaNumChar *> consumeSpaces
+
+tsTypeString :: Text -> Parser ()
+tsTypeString w = string w *> notFollowedBy alphaNumChar *> consumeSpaces
 
 rws :: [Text] -- list of reserved words
 rws = ["if", "then", "else", "while", "true", "false"]
@@ -72,13 +76,41 @@ parseNumber = Number <$> integer
 
 parseBoolean :: Parser Expr
 parseBoolean = label "boolean" $ do
-  boolean <-  (keyword "true" $> True) <|> (keyword "false" $> False)
+  boolean <- (keyword "true" $> True) <|> (keyword "false" $> False)
   pure $ Boolean boolean
-          
+
 parseCursed :: Parser Expr
-parseCursed = label "undefined or null" $ do
+parseCursed =
+  label "undefined or null" $
+    do
       keyword "undefined" $> Undefined
-  <|> keyword "null" $> Null
+      <|> keyword "null" $> Null
+
+parseArray :: Parser Expr
+parseArray =
+  label "array" $
+    Array <$> brackets (parseIdentifier `sepBy` comma)
+
+parseArrayType :: Parser TsType
+parseArrayType = label "array type" $ do
+  tsTypeString "Array" *> notFollowedBy alphaNumChar
+  tsType <- chevrons parseTsType
+  pure $ ArrayType tsType
+
+parseTsType :: Parser TsType
+parseTsType =
+  label "typescript type" $
+    tsTypeString "void" $> VoidType
+      <|> tsTypeString "boolean" $> BooleanType
+      <|> tsTypeString "number" $> NumberType
+      <|> parseArrayType
+
+parseArrayLookup :: Parser Expr
+parseArrayLookup =
+  label "array lookup" $
+    ArrayLookup
+      <$> parseIdentifier
+      <*> brackets parseExpression
 
 -- args <- (expression (COMMA expression)*)?
 -- call <- ID LEFT_PAREN args RIGHT_PAREN
@@ -94,9 +126,11 @@ parseTerm =
     parseNumber
       <|> parseBoolean
       <|> parseCursed
+      <|> parens parseExpression
+      <|> try parseArrayLookup
+      <|> parseArray
       <|> try parseCall
       <|> parseIdentifier
-      <|> parens parseExpression
 
 parseExpression :: Parser Expr
 parseExpression = makeExprParser parseTerm operatorTable <?> "Expression"
@@ -176,10 +210,26 @@ parseBlockStatement = label "block" $ do
   stmts <- braces $ many parseStatement
   pure $ Block stmts
 
+-- | Defaults to 'NumberType' if no annotation is found.
+parseOptionalTypeAnnotation :: Parser TsType
+parseOptionalTypeAnnotation = label "optional type annotation" $ do
+  mType <- optional (colon *> parseTsType)
+  case mType of
+    Nothing -> pure NumberType
+    Just t -> pure t
+
+parseParameter :: Parser (Text, TsType)
+parseParameter = label "parameter" $ do
+  param <- parseTextIdentifier
+  t <- parseOptionalTypeAnnotation
+  pure (param, t)
+
 parseFunctionStatement :: Parser AST
 parseFunctionStatement = label "function" $ do
   keyword "function"
   name <- parseTextIdentifier
-  parameters <- parens (parseTextIdentifier `sepBy` comma)
+  parsedParams <- parens (parseParameter `sepBy` comma)
+  returnType <- parseOptionalTypeAnnotation
   body <- parseBlockStatement
+  let parameters = Fn (OMap.fromList parsedParams) returnType
   pure $ Function name parameters body

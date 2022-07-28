@@ -32,8 +32,17 @@ parens = between (symbol "(") (symbol ")")
 braces :: Parser a -> Parser a
 braces = between (symbol "{") (symbol "}")
 
+brackets :: Parser a -> Parser a
+brackets = between (symbol "[") (symbol "]")
+
+chevrons :: Parser a -> Parser a
+chevrons = between (symbol "<") (symbol ">")
+
 semicolon :: Parser Text
 semicolon = lexeme (symbol ";") <?> ";"
+
+colon :: Parser Text
+colon = lexeme (symbol ":") <?> ":"
 
 assign :: Parser Text
 assign = lexeme (symbol "=") <?> "="

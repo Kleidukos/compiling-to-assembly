@@ -13,6 +13,7 @@ import Control.Monad.Trans.Reader (ReaderT (runReaderT), ask)
 import Data.Foldable (foldMap')
 import Data.Map (Map)
 import qualified Data.Map as Map
+import qualified Data.Map.Ordered.Strict as OMap
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Data.Text.Display
@@ -78,19 +79,92 @@ emit (While condition body) = emitWhile condition body
 emit (Assign var content) = emitAssign var content
 
 emitExpr :: Expr -> CodeGenM Text
-emitExpr (Number i) = emitNumber i
-emitExpr (Boolean bool) = emitBoolean bool
-emitExpr Undefined = emitBoolean False
-emitExpr Null = emitBoolean False
-emitExpr (Not term) = emitNot term
 emitExpr (Add left right) = emitAdd left right
-emitExpr (Subtract left right) = emitSubtract left right
-emitExpr (Multiply left right) = emitMultiply left right
+emitExpr (Array content) = emitArray content
+emitExpr (ArrayLookup array index) = emitArrayLookup array index
+emitExpr (Boolean bool) = emitBoolean bool
+emitExpr (Call callee arguments) = emitCall callee arguments
 emitExpr (Divide left right) = emitDivide left right
 emitExpr (Equal left right) = emitEqual left right
-emitExpr (NotEqual left right) = emitNotEqual left right
-emitExpr (Call callee arguments) = emitCall callee arguments
 emitExpr (Identifier identifier) = emitIdentifier identifier
+emitExpr (Length expression) = emitLength expression
+emitExpr (Multiply left right) = emitMultiply left right
+emitExpr (Not term) = emitNot term
+emitExpr (NotEqual left right) = emitNotEqual left right
+emitExpr (Number i) = emitNumber i
+emitExpr (Subtract left right) = emitSubtract left right
+emitExpr Null = emitBoolean False
+emitExpr Undefined = emitBoolean False
+
+emitLength :: Expr -> CodeGenM Text
+emitLength array = do
+  renderedArray <- emitExpr array
+  pure
+    [fmt|
+  {renderedArray}
+  ldr r0, [r0, #0]
+|]
+
+emitArray :: [Expr] -> CodeGenM Text
+emitArray elements = do
+  let arrayLength = length elements
+  args' <- iforM elements $ \index arg -> do
+    argExpr <- emitExpr arg
+    pure $
+      foldMap'
+        (<> "\n")
+        [ argExpr
+        , "  str r0, [r4, #" <> display (4 * (index + 1)) <> "]"
+        ]
+  let args = Text.unlines args'
+  pure
+    [fmt|
+  // malloc enough memory for n words in bytes (1 word = 4 bytes)
+  ldr r0, ={4 * (arrayLength + 1)} 
+  bl malloc
+
+  // get the pointer in r0, save it in r4,
+  // but before, save the value of r4 on the stack.
+  push {{r4, ip}}
+  mov r4, r0
+
+  // store array length in the first word
+  // of the allocate span of memory
+  ldr r0, ={arrayLength}
+  // at offset 0 (implicitly)
+  str r0, [r4]
+
+  // emit code for each element
+  // and store it into the corresponding memory slot.
+  {args}
+
+  // return the pointer in r0
+  // and restore the call-preserved r4
+  mov r0, r4
+  pop {{r4, ip}}
+|]
+
+emitArrayLookup :: Expr -> Expr -> CodeGenM Text
+emitArrayLookup array index = do
+  renderedArray <- emitExpr array
+  renderedIndex <- emitExpr index
+  pure
+    [fmt|
+  // store the array pointer in r1
+  // and array index in r0
+  {renderedArray}
+  push {{r0, ip}}
+  {renderedIndex}
+  pop {{r1, ip}}
+
+  // perform bound check
+  // and convert array index into a byte offset
+  // (with lsl #2, equivalent to multiplying by 4)
+  ldr r2, [r1], #4
+  cmp r0, r2
+  movhs r0, #0
+  ldrlo r0, [r1, r0, lsl #2]
+|]
 
 emitNumber :: Integer -> CodeGenM Text
 emitNumber i =
@@ -99,8 +173,8 @@ emitNumber i =
 emitBoolean :: Bool -> CodeGenM Text
 emitBoolean bool = do
   if bool
-  then pure [fmt|  mov r0, #1 |]
-  else pure [fmt|  mov r0, #0 |]
+    then pure [fmt|  mov r0, #1 |]
+    else pure [fmt|  mov r0, #0 |]
 
 emitNot :: Expr -> CodeGenM Text
 emitNot term = do
@@ -284,10 +358,10 @@ emitIf conditional consequence alternative = do
 {endIfLabel}:
 |]
 
-emitFunction :: Text -> [Text] -> AST -> CodeGenM Text
+emitFunction :: Text -> Fn -> AST -> CodeGenM Text
 emitFunction name arguments body
-  | length arguments > 4 = error "More than 4 arguments is not supported!"
-  | otherwise = emitFunction4 name arguments body
+  | OMap.size (parameters arguments) > 4 = error "More than 4 arguments is not supported!"
+  | otherwise = emitFunction4 name (fmap fst $ OMap.assocs (parameters arguments)) body
 
 emitFunction4 :: Text -> [Text] -> AST -> CodeGenM Text
 emitFunction4 name arguments body = do
