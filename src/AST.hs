@@ -11,6 +11,9 @@ import Lexer
 
 data Expr
   = Number Integer
+  | Boolean Bool
+  | Undefined
+  | Null
   | Identifier Text
   | Not Expr
   | Equal Expr Expr

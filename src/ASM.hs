@@ -79,6 +79,9 @@ emit (Assign var content) = emitAssign var content
 
 emitExpr :: Expr -> CodeGenM Text
 emitExpr (Number i) = emitNumber i
+emitExpr (Boolean bool) = emitBoolean bool
+emitExpr Undefined = emitBoolean False
+emitExpr Null = emitBoolean False
 emitExpr (Not term) = emitNot term
 emitExpr (Add left right) = emitAdd left right
 emitExpr (Subtract left right) = emitSubtract left right
@@ -92,6 +95,12 @@ emitExpr (Identifier identifier) = emitIdentifier identifier
 emitNumber :: Integer -> CodeGenM Text
 emitNumber i =
   pure [fmt|ldr r0, ={i}|]
+
+emitBoolean :: Bool -> CodeGenM Text
+emitBoolean bool = do
+  if bool
+  then pure [fmt|  mov r0, #1 |]
+  else pure [fmt|  mov r0, #0 |]
 
 emitNot :: Expr -> CodeGenM Text
 emitNot term = do

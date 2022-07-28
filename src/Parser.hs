@@ -12,6 +12,7 @@ import qualified Text.Megaparsec.Char.Lexer as L
 
 import AST
 import Lexer
+import Data.Functor (($>))
 
 parseLine :: Text -> Either String AST
 parseLine input =
@@ -69,6 +70,16 @@ parseIdentifier = Identifier <$> parseTextIdentifier
 parseNumber :: Parser Expr
 parseNumber = Number <$> integer
 
+parseBoolean :: Parser Expr
+parseBoolean = label "boolean" $ do
+  boolean <-  (keyword "true" $> True) <|> (keyword "false" $> False)
+  pure $ Boolean boolean
+          
+parseCursed :: Parser Expr
+parseCursed = label "undefined or null" $ do
+      keyword "undefined" $> Undefined
+  <|> keyword "null" $> Null
+
 -- args <- (expression (COMMA expression)*)?
 -- call <- ID LEFT_PAREN args RIGHT_PAREN
 parseCall :: Parser Expr
@@ -81,6 +92,8 @@ parseTerm :: Parser Expr
 parseTerm =
   label "term" $
     parseNumber
+      <|> parseBoolean
+      <|> parseCursed
       <|> try parseCall
       <|> parseIdentifier
       <|> parens parseExpression
