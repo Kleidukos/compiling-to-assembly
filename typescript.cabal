@@ -70,13 +70,13 @@ library
     , base
     , containers
     , megaparsec
+    , mtl
     , ordered-containers
     , parser-combinators
     , PyF
     , text
     , text-display
     , transformers
-    , mtl
 
   hs-source-dirs:  src
 
@@ -108,10 +108,10 @@ test-suite typescript-test
     , bytestring
     , containers
     , megaparsec
+    , ordered-containers
     , PyF
     , tasty
     , tasty-golden
     , tasty-hunit
     , text
     , typescript
-    , ordered-containers

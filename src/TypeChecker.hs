@@ -42,9 +42,7 @@ newtype TypeCheckM a = TypeCheckM {getTc :: ExceptT TypeCheckError (StateT TypeC
 
 assertType :: TsType -> TsType -> TypeCheckM ()
 assertType expected got =
-  if expected /= got
-    then throwError $ TypeMismatch expected got
-    else pure ()
+  when (expected /= got) $ throwError $ TypeMismatch expected got
 
 checkNode :: AST -> TypeCheckM TsType
 checkNode (Assign name value) = checkAssign name value
