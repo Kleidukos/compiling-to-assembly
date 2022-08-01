@@ -20,6 +20,7 @@ import Data.Text.Display
 import PyF
 
 import AST
+import Utils
 
 data CodeGenEnv = CodeGenEnv
   { labelCounter :: Word
@@ -82,7 +83,6 @@ emitExpr :: Expr -> CodeGenM Text
 emitExpr (Add left right) = emitAdd left right
 emitExpr (Array content) = emitArray content
 emitExpr (ArrayLookup array index) = emitArrayLookup array index
-emitExpr (Boolean bool) = emitBoolean bool
 emitExpr (Call callee arguments) = emitCall callee arguments
 emitExpr (Divide left right) = emitDivide left right
 emitExpr (Equal left right) = emitEqual left right
@@ -91,10 +91,14 @@ emitExpr (Length expression) = emitLength expression
 emitExpr (Multiply left right) = emitMultiply left right
 emitExpr (Not term) = emitNot term
 emitExpr (NotEqual left right) = emitNotEqual left right
-emitExpr (Number i) = emitNumber i
 emitExpr (Subtract left right) = emitSubtract left right
-emitExpr Null = emitBoolean False
-emitExpr Undefined = emitBoolean False
+emitExpr (PrimType ty) = emitPrim ty
+
+emitPrim :: PrimitiveType -> CodeGenM Text
+emitPrim (Number i) = emitNumber i
+emitPrim (Boolean bool) = emitBoolean bool
+emitPrim Null = emitBoolean False
+emitPrim Undefined = emitBoolean False
 
 emitLength :: Expr -> CodeGenM Text
 emitLength array = do
@@ -455,9 +459,3 @@ emitAssign name value = do
   {renderedValue}
   str r0, [fp, #{offset}]
 |]
-
-iforM :: [a] -> (Int -> a -> CodeGenM b) -> CodeGenM [b]
-iforM list fun = go ilist
-  where
-    ilist = zip [0 ..] list
-    go l = mapM (uncurry fun) l

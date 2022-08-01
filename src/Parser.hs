@@ -64,27 +64,26 @@ parseTextIdentifier =
 
     identifierParser :: Parser Text
     identifierParser = do
-      beginning <- letterChar <|> char '_'
-      rest <- many (letterChar <|> digitChar <|> char '_')
-      pure $ T.pack $ [beginning] <> rest
+      ident <- many (letterChar <|> digitChar <|> char '_')
+      pure $ T.pack ident
 
 parseIdentifier :: Parser Expr
 parseIdentifier = Identifier <$> parseTextIdentifier
 
 parseNumber :: Parser Expr
-parseNumber = Number <$> integer
+parseNumber = PrimType . Number <$> integer
 
 parseBoolean :: Parser Expr
 parseBoolean = label "boolean" $ do
   boolean <- (keyword "true" $> True) <|> (keyword "false" $> False)
-  pure $ Boolean boolean
+  pure $ PrimType (Boolean boolean)
 
 parseCursed :: Parser Expr
 parseCursed =
   label "undefined or null" $
     do
-      keyword "undefined" $> Undefined
-      <|> keyword "null" $> Null
+      keyword "undefined" $> PrimType Undefined
+      <|> keyword "null" $> PrimType Null
 
 parseArray :: Parser Expr
 parseArray =

@@ -17,7 +17,7 @@ specs =
     "Parser tests"
     [ testCase "Parse factorial" parseFactorialTest
     , testCase "Parse pair" parsePairTest
-    , testCase "if condition" parseIfConditionTest
+    , testCase "if-else condition" parseIfElseConditionTest
     ]
 
 parseFactorialTest :: Assertion
@@ -38,11 +38,11 @@ parseFactorialTest = do
         Block
           [ Function "factorial" (Fn (OMap.fromList [("n", NumberType)]) NumberType) $
               Block
-                [ Var "result" (Number 1)
-                , While (NotEqual (Identifier "n") (Number 1)) $
+                [ Var "result" (PrimType $ Number 1)
+                , While (NotEqual (Identifier "n") (PrimType $ Number 1)) $
                     Block
                       [ Assign "result" (Multiply (Identifier "result") (Identifier "n"))
-                      , Assign "n" (Subtract (Identifier "n") (Number 1))
+                      , Assign "n" (Subtract (Identifier "n") (PrimType $ Number 1))
                       ]
                 , Return (Identifier "result")
                 ]
@@ -67,8 +67,8 @@ parsePairTest = do
           ]
   result `assertAST` expected
 
-parseIfConditionTest :: Assertion
-parseIfConditionTest = do
+parseIfElseConditionTest :: Assertion
+parseIfElseConditionTest = do
   let result =
         parseLine
           [str|
@@ -88,8 +88,8 @@ parseIfConditionTest = do
               ( Block
                   [ If
                       (Identifier "x")
-                      (Block [ExprStmt (Call "putchar" [Number 46])])
-                      (Block [ExprStmt (Call "putchar" [Number 70])])
+                      (Block [ExprStmt (Call "putchar" [PrimType $ Number 46])])
+                      (Block [ExprStmt (Call "putchar" [PrimType $ Number 70])])
                   ]
               )
           ]

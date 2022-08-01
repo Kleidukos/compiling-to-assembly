@@ -63,6 +63,8 @@ library
     AST
     Lexer
     Parser
+    TypeChecker
+    Utils
 
   build-depends:
     , base
@@ -74,6 +76,7 @@ library
     , text
     , text-display
     , transformers
+    , mtl
 
   hs-source-dirs:  src
 

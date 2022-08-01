@@ -87,19 +87,20 @@ emitAssertTest = do
     @?= Block
       [ Function
           "assert"
-          Fn{parameters = OMap.fromList [("x", BooleanType)], returnType = VoidType}
+          (Fn{parameters = OMap.fromList [("x", BooleanType)], returnType = VoidType})
           ( Block
               [ If
                   (Identifier "x")
-                  (Block [ExprStmt (Call "putchar" [Number 46])])
-                  (Block [ExprStmt (Call "putchar" [Number 70])])
+                  (Block [ExprStmt (Call "putchar" [PrimType (Number 46)])])
+                  (Block [ExprStmt (Call "putchar" [PrimType (Number 70)])])
               ]
           )
       , Function
           "main"
-          Fn{parameters = OMap.empty, returnType = NumberType}
-          (Block [ExprStmt (Call "assert" [Number 1])])
+          (Fn{parameters = OMap.fromList [("", NumberType)], returnType = VoidType})
+          (Block [ExprStmt (Call "assert" [PrimType (Number 1)])])
       ]
+
   Text.encodeUtf8 . Text.fromStrict <$> runCodeGen (emit parsed)
 
 emitAssertNegationTest :: IO ByteString
@@ -126,23 +127,20 @@ emitAssertNegationTest = do
     @?= Block
       [ Function
           "assert"
-          Fn{parameters = OMap.fromList [("x", BooleanType)], returnType = VoidType}
+          (Fn{parameters = OMap.fromList [("x", BooleanType)], returnType = VoidType})
           ( Block
               [ If
                   (Identifier "x")
-                  (Block [ExprStmt (Call "putchar" [Number 46])])
-                  (Block [ExprStmt (Call "putchar" [Number 70])])
+                  (Block [ExprStmt (Call "putchar" [PrimType (Number 46)])])
+                  (Block [ExprStmt (Call "putchar" [PrimType (Number 70)])])
               ]
           )
       , Function
           "main"
-          Fn{parameters = OMap.empty, returnType = NumberType}
-          ( Block
-              [ ExprStmt (Call "assert" [Number 1])
-              , ExprStmt (Call "assert" [Not (Number 0)])
-              ]
-          )
+          (Fn{parameters = OMap.fromList [("", NumberType)], returnType = VoidType})
+          (Block [ExprStmt (Call "assert" [PrimType (Number 1)]), ExprStmt (Call "assert" [Not (PrimType (Number 0))])])
       ]
+
   generated <- runCodeGen (emit parsed)
   pure . Text.encodeUtf8 . Text.fromStrict $ generated
 
@@ -175,32 +173,41 @@ emitBlockAndInfixTest = do
     @?= Block
       [ Function
           "assert"
-          Fn{parameters = OMap.fromList [("x", BooleanType)], returnType = VoidType}
+          (Fn{parameters = OMap.fromList [("x", BooleanType)], returnType = VoidType})
           ( Block
               [ If
                   (Identifier "x")
-                  (Block [ExprStmt (Call "putchar" [Number 46])])
-                  (Block [ExprStmt (Call "putchar" [Number 70])])
+                  (Block [ExprStmt (Call "putchar" [PrimType (Number 46)])])
+                  (Block [ExprStmt (Call "putchar" [PrimType (Number 70)])])
               ]
           )
       , Function
           "main"
-          Fn{parameters = OMap.empty, returnType = VoidType}
+          (Fn{parameters = OMap.fromList [("", NumberType)], returnType = VoidType})
           ( Block
-              [ ExprStmt (Call "assert" [Number 1])
-              , ExprStmt (Call "assert" [Not (Number 0)])
+              [ ExprStmt (Call "assert" [PrimType (Number 1)])
+              , ExprStmt (Call "assert" [Not (PrimType (Number 0))])
               , ExprStmt
                   ( Call
                       "assert"
                       [ Equal
-                          (Number 42)
+                          (PrimType (Number 42))
                           ( Add
-                              (Add (Number 4) (Multiply (Number 2) (Subtract (Number 12) (Number 2))))
-                              (Multiply (Number 3) (Add (Number 5) (Number 1)))
+                              ( Add
+                                  (PrimType (Number 4))
+                                  (Multiply (PrimType (Number 2)) (Subtract (PrimType (Number 12)) (PrimType (Number 2))))
+                              )
+                              ( Multiply
+                                  (PrimType (Number 3))
+                                  ( Add
+                                      (PrimType (Number 5))
+                                      (PrimType (Number 1))
+                                  )
+                              )
                           )
                       ]
                   )
-              , Block [ExprStmt (Call "assert" [Number 1]), ExprStmt (Call "assert" [Number 1])]
+              , Block [ExprStmt (Call "assert" [PrimType (Number 1)]), ExprStmt (Call "assert" [PrimType (Number 1)])]
               ]
           )
       ]
@@ -239,27 +246,28 @@ emitIfAndLabelsTest = do
     @?= Block
       [ Function
           "assert"
-          Fn{parameters = OMap.fromList [("x", BooleanType)], returnType = VoidType}
+          (Fn{parameters = OMap.fromList [("x", BooleanType)], returnType = VoidType})
           ( Block
               [ If
                   (Identifier "x")
-                  (Block [ExprStmt (Call "putchar" [Number 46])])
-                  (Block [ExprStmt (Call "putchar" [Number 70])])
+                  (Block [ExprStmt (Call "putchar" [PrimType (Number 46)])])
+                  (Block [ExprStmt (Call "putchar" [PrimType (Number 70)])])
               ]
           )
       , Function
           "main"
-          Fn{parameters = OMap.empty, returnType = VoidType}
-          $ Block
-            [ If
-                (Number 1)
-                (Block [ExprStmt (Call "assert" [Number 1])])
-                (Block [ExprStmt (Call "assert" [Number 0])])
-            , If
-                (Number 0)
-                (Block [ExprStmt (Call "assert" [Number 0])])
-                (Block [ExprStmt (Call "assert" [Number 1])])
-            ]
+          (Fn{parameters = OMap.fromList [("", NumberType)], returnType = VoidType})
+          ( Block
+              [ If
+                  (PrimType (Number 1))
+                  (Block [ExprStmt (Call "assert" [PrimType (Number 1)])])
+                  (Block [ExprStmt (Call "assert" [PrimType (Number 0)])])
+              , If
+                  (PrimType (Number 0))
+                  (Block [ExprStmt (Call "assert" [PrimType (Number 0)])])
+                  (Block [ExprStmt (Call "assert" [PrimType (Number 1)])])
+              ]
+          )
       ]
   generated <- runCodeGen (emit parsed)
   pure . Text.encodeUtf8 . Text.fromStrict $ generated
@@ -289,30 +297,26 @@ emitVarTest = do
     @?= Block
       [ Function
           "assert"
-          Fn{parameters = OMap.fromList [("x", BooleanType)], returnType = VoidType}
+          (Fn{parameters = OMap.fromList [("x", BooleanType)], returnType = VoidType})
           ( Block
               [ If
                   (Identifier "x")
-                  (Block [ExprStmt (Call "putchar" [Number 46])])
-                  (Block [ExprStmt (Call "putchar" [Number 70])])
+                  (Block [ExprStmt (Call "putchar" [PrimType (Number 46)])])
+                  (Block [ExprStmt (Call "putchar" [PrimType (Number 70)])])
               ]
           )
       , Function
           "main"
-          Fn{parameters = OMap.empty, returnType = VoidType}
+          (Fn{parameters = OMap.fromList [("", NumberType)], returnType = VoidType})
           ( Block
-              [ Var "x" (Add (Number 4) (Multiply (Number 2) (Subtract (Number 12) (Number 2))))
-              , Var
-                  "y"
-                  ( Multiply
-                      (Number 3)
-                      (Add (Number 5) (Number 1))
-                  )
+              [ Var "x" (Add (PrimType (Number 4)) (Multiply (PrimType (Number 2)) (Subtract (PrimType (Number 12)) (PrimType (Number 2)))))
+              , Var "y" (Multiply (PrimType (Number 3)) (Add (PrimType (Number 5)) (PrimType (Number 1))))
               , Var "z" (Add (Identifier "x") (Identifier "y"))
-              , ExprStmt (Call "assert" [Equal (Identifier "z") (Number 42)])
+              , ExprStmt (Call "assert" [Equal (Identifier "z") (PrimType (Number 42))])
               ]
           )
       ]
+
   generated <- runCodeGen (emit parsed)
   pure . Text.encodeUtf8 . Text.fromStrict $ generated
 
@@ -343,29 +347,26 @@ emitWhileTest = do
     @?= Block
       [ Function
           "assert"
-          Fn{parameters = OMap.fromList [("x", BooleanType)], returnType = VoidType}
+          (Fn{parameters = OMap.fromList [("x", BooleanType)], returnType = VoidType})
           ( Block
               [ If
                   (Identifier "x")
-                  (Block [ExprStmt (Call "putchar" [Number 46])])
-                  (Block [ExprStmt (Call "putchar" [Number 70])])
+                  (Block [ExprStmt (Call "putchar" [PrimType (Number 46)])])
+                  (Block [ExprStmt (Call "putchar" [PrimType (Number 70)])])
               ]
           )
       , Function
           "main"
-          Fn{parameters = OMap.empty, returnType = VoidType}
+          (Fn{parameters = OMap.fromList [("", NumberType)], returnType = VoidType})
           ( Block
-              [ Var "i" (Number 0)
+              [ Var "i" (PrimType (Number 0))
               , While
-                  (NotEqual (Identifier "i") (Number 3))
-                  ( Block
-                      [Assign "i" (Add (Identifier "i") (Number 1))]
-                  )
-              , ExprStmt $ Call "putchar" [Identifier "i"]
-              , ExprStmt $ Call "assert" [Equal (Identifier "i") (Number 3)]
+                  (NotEqual (Identifier "i") (PrimType (Number 3)))
+                  (Block [Assign "i" (Add (Identifier "i") (PrimType (Number 1)))])
+              , ExprStmt (Call "putchar" [Identifier "i"])
+              , ExprStmt (Call "assert" [Equal (Identifier "i") (PrimType (Number 3))])
               ]
           )
       ]
-
   generated <- runCodeGen (emit parsed)
   pure . Text.encodeUtf8 . Text.fromStrict $ generated

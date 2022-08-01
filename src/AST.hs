@@ -3,6 +3,7 @@ module AST
   , Expr (..)
   , TsType (..)
   , Fn (..)
+  , PrimitiveType (..)
   , operatorTable
   )
 where
@@ -10,14 +11,23 @@ where
 import Control.Monad.Combinators.Expr
 import qualified Data.Foldable as Foldable
 import Data.Map.Ordered (OMap)
+import qualified Data.Map.Ordered.Strict as OMap
 import Data.Text (Text)
+import Data.Text.Display
+import qualified Data.Text.Internal.Builder as Builder
 import Lexer
+
+data PrimitiveType
+  = Number Integer
+  | Boolean Bool
+  | Null
+  | Undefined
+  deriving stock (Eq, Ord, Show)
 
 data Expr
   = Add Expr Expr
   | Array [Expr]
   | ArrayLookup Expr Expr
-  | Boolean Bool
   | Call Text [Expr]
   | Divide Expr Expr
   | Equal Expr Expr
@@ -26,36 +36,53 @@ data Expr
   | Multiply Expr Expr
   | Not Expr
   | NotEqual Expr Expr
-  | Null
-  | Number Integer
+  | PrimType PrimitiveType
   | Subtract Expr Expr
-  | Undefined
   deriving stock (Eq, Ord, Show)
 
 data AST
-  = ExprStmt Expr
-  | Return Expr
+  = Assign Text Expr
   | Block [AST]
+  | ExprStmt Expr
+  | Function
+      Text
+      -- ^ name
+      Fn
+      -- ^ signature
+      AST
+      -- ^ body
   | If Expr AST AST
-  | Function Text Fn AST
+  | Return Expr
   | Var Text Expr
-  | Assign Text Expr
   | While Expr AST
   deriving stock (Eq, Ord, Show)
 
 data TsType
-  = BooleanType
+  = ArrayType TsType
+  | BooleanType
+  | FunctionType Fn
   | NumberType
   | VoidType
-  | ArrayType TsType
-  | FunctionType Fn
   deriving stock (Eq, Ord, Show)
+
+instance Display TsType where
+  displayBuilder BooleanType = "boolean"
+  displayBuilder NumberType = "number"
+  displayBuilder VoidType = "void"
+  displayBuilder (ArrayType t) = "Array<" <> displayBuilder t <> ">"
+  displayBuilder (FunctionType fn) = displayBuilder fn
 
 data Fn = Fn
   { parameters :: OMap Text TsType
   , returnType :: TsType
   }
   deriving stock (Ord, Show)
+
+instance Display Fn where
+  displayBuilder (Fn parameters returnType) = "(" <> Builder.fromText typeList <> ")"
+    where
+      argsList = foldMap ((\t -> display t <> " -> ") . snd) (OMap.assocs parameters)
+      typeList = argsList <> display returnType
 
 instance Eq Fn where
   Fn params _ == Fn params' _ =
