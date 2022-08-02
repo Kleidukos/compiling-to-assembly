@@ -3,7 +3,7 @@
 
 module TypeChecker where
 
-import Control.Monad.Except (ExceptT, MonadError, throwError)
+import Control.Monad.Except (ExceptT, MonadError, runExceptT, throwError)
 import Control.Monad.State.Strict
 import qualified Control.Monad.State.Strict as State
 import Data.List.NonEmpty (NonEmpty (..))
@@ -16,12 +16,22 @@ import Data.Text (Text)
 
 import AST
 import Data.Text.Display (display)
+import Utils
 
 data TypeCheckEnv = TypeCheckEnv
   { locals :: OMap Text TsType
   , functions :: Map Text Fn
   , currentFunctionReturnType :: Maybe TsType
   }
+  deriving stock (Eq, Ord, Show)
+
+emptyTcEnv :: TypeCheckEnv
+emptyTcEnv =
+  TypeCheckEnv
+    { locals = OMap.empty
+    , functions = Map.empty
+    , currentFunctionReturnType = Nothing
+    }
 
 data TypeCheckError
   = TypeMismatch
@@ -30,6 +40,7 @@ data TypeCheckError
       TsType
       -- ^ got
   | UndefinedVariable Text
+  | UndefinedFunction Text
   | EmptyArray
   | -- | got
     NotAnArray
@@ -40,19 +51,25 @@ data TypeCheckError
 newtype TypeCheckM a = TypeCheckM {getTc :: ExceptT TypeCheckError (StateT TypeCheckEnv IO) a}
   deriving newtype (Functor, Applicative, Monad, MonadError TypeCheckError, MonadState TypeCheckEnv, MonadIO)
 
+runTypeCheckM :: forall a. TypeCheckM a -> IO (Either TypeCheckError a, TypeCheckEnv)
+runTypeCheckM computation = runStateT (runExceptT $ getTc computation) emptyTcEnv
+
 assertType :: TsType -> TsType -> TypeCheckM ()
 assertType expected got =
-  when (expected /= got) $ throwError $ TypeMismatch expected got
+  when (expected /= got) $ do
+    tcEnv <- get
+    liftIO $ say $ show tcEnv
+    throwError $ TypeMismatch expected got
 
 checkNode :: AST -> TypeCheckM TsType
 checkNode (Assign name value) = checkAssign name value
-checkNode (ExprStmt (PrimType ty)) = checkPrimType ty
 checkNode (ExprStmt expr) = checkExpr expr
 checkNode (Function name signature body) = checkFunction name signature body
 checkNode (If condition consequence alternative) = checkIf condition consequence alternative
 checkNode (Var name value) = checkVar name value
 checkNode (While condition body) = checkWhile condition body
 checkNode (Return expr) = checkReturn expr
+checkNode (Block exprs) = checkBlock exprs
 
 checkPrimType :: PrimitiveType -> TypeCheckM TsType
 checkPrimType (Boolean _) = pure BooleanType
@@ -62,11 +79,18 @@ checkPrimType Null = pure VoidType
 
 checkExpr :: Expr -> TypeCheckM TsType
 checkExpr (Not booleanExpr) = checkNot booleanExpr
-checkExpr (Add left right) = checkAdd left right
 checkExpr (Length expr) = checkArrayLength expr
 checkExpr (Call callee arguments) = checkCall callee arguments
 checkExpr (Array args) = checkArray args
 checkExpr (ArrayLookup arg index) = checkArrayLookup arg index
+checkExpr (Identifier name) = checkId name
+checkExpr (PrimType ty) = checkPrimType ty
+checkExpr (Add left right) = checkNumericOp left right
+checkExpr (Divide left right) = checkNumericOp left right
+checkExpr (Subtract left right) = checkNumericOp left right
+checkExpr (Multiply left right) = checkNumericOp left right
+checkExpr (Equal left right) = checkBooleanOp left right
+checkExpr (NotEqual left right) = checkBooleanOp left right
 
 checkNot :: Expr -> TypeCheckM TsType
 checkNot node = do
@@ -74,12 +98,19 @@ checkNot node = do
   assertType BooleanType checkedNode
   pure BooleanType
 
-checkAdd :: Expr -> Expr -> TypeCheckM TsType
-checkAdd left right = do
+checkNumericOp :: Expr -> Expr -> TypeCheckM TsType
+checkNumericOp left right = do
   checkedLeft <- checkExpr left
   checkedRight <- checkExpr right
   assertType NumberType checkedLeft
   assertType NumberType checkedRight
+  pure NumberType
+
+checkBooleanOp :: Expr -> Expr -> TypeCheckM TsType
+checkBooleanOp left right = do
+  checkedLeft <- checkExpr left
+  checkedRight <- checkExpr right
+  assertType checkedRight checkedLeft
   pure BooleanType
 
 checkVar :: Text -> Expr -> TypeCheckM TsType
@@ -153,6 +184,11 @@ checkReturn returnExpr = do
       assertType t returnType
       pure VoidType
 
+checkBlock :: [AST] -> TypeCheckM TsType
+checkBlock exprs = do
+  res <- mapM checkNode exprs
+  pure $ last res
+
 checkIf :: Expr -> AST -> AST -> TypeCheckM TsType
 checkIf condition consequence alternative = do
   checkExpr condition
@@ -174,7 +210,7 @@ addFunction name signature = do
     ( \env ->
         let TypeCheckEnv{functions} = env
             newFunctions = Map.insert name signature functions
-         in env{functions = newFunctions}
+         in TypeCheckEnv{functions = newFunctions, locals = parameters signature, currentFunctionReturnType = Just (returnType signature)}
     )
 
 getFunction :: Text -> TypeCheckM Fn
@@ -182,7 +218,7 @@ getFunction name = do
   result <- State.gets (\TypeCheckEnv{functions} -> Map.lookup name functions)
   case result of
     Just a -> pure a
-    Nothing -> throwError $ UndefinedVariable name
+    Nothing -> throwError $ UndefinedFunction name
 
 addLocal :: Text -> TsType -> TypeCheckM ()
 addLocal name tsType =

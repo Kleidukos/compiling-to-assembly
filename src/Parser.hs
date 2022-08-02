@@ -14,6 +14,7 @@ import qualified Text.Megaparsec.Char.Lexer as L
 
 import AST
 import Lexer
+import Utils
 
 parseLine :: Text -> Either String AST
 parseLine input =
@@ -25,7 +26,7 @@ parse :: forall a. (Show a) => Parser a -> Text -> IO ()
 parse parser input =
   case runParser parser "<line>" input of
     Left eb -> putStrLn $ errorBundlePretty eb
-    Right result -> print result
+    Right result -> say . show $ result
 
 -- nonAlphaNumTokens :: [Token Text]
 -- nonAlphaNumTokens = "!?¡¿$€%&|*×÷+-/:<=>@^_~"

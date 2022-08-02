@@ -2,14 +2,14 @@
 
 module ParserTest where
 
+import qualified Data.Map.Ordered.Strict as OMap
 import PyF
 import Test.Tasty
 import Test.Tasty.HUnit
 
 import AST
-import qualified Data.Map.Ordered.Strict as OMap
 import Parser
-import Utils
+import TestUtils
 
 specs :: TestTree
 specs =

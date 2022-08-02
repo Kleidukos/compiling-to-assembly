@@ -68,6 +68,7 @@ library
 
   build-depends:
     , base
+    , bytestring
     , containers
     , megaparsec
     , mtl
@@ -101,7 +102,8 @@ test-suite typescript-test
   other-modules:
     ASMTest
     ParserTest
-    Utils
+    TCTest
+    TestUtils
 
   build-depends:
     , base

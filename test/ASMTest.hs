@@ -14,7 +14,7 @@ import qualified Data.Map.Ordered.Strict as OMap
 import qualified Data.Text.Lazy as Text
 import qualified Data.Text.Lazy.Encoding as Text
 import Parser
-import Utils
+import TestUtils
 
 diffCmd :: String -> String -> [String]
 diffCmd ref new = ["delta", "--diff-so-fancy", "--paging=never", ref, new]

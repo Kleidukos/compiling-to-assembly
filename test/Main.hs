@@ -5,6 +5,7 @@ import Test.Tasty
 
 import qualified ASMTest
 import qualified ParserTest
+import qualified TCTest
 
 main :: IO ()
 main = do
@@ -14,4 +15,5 @@ main = do
       "Compiler Tests"
       [ ParserTest.specs
       , ASMTest.specs
+      , TCTest.specs
       ]
