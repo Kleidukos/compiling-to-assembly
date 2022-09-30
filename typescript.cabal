@@ -59,7 +59,7 @@ library
   import:          common-extensions
   import:          common-ghc-options
   exposed-modules:
-    ASM
+    CodeGen.ARM32
     AST
     Lexer
     Parser
@@ -100,7 +100,7 @@ test-suite typescript-test
   hs-source-dirs: test
   main-is:        Main.hs
   other-modules:
-    ASMTest
+    CodeGen.ARM32Test
     ParserTest
     TCTest
     TestUtils

@@ -1,6 +1,6 @@
 {-# LANGUAGE QuasiQuotes #-}
 
-module ASMTest where
+module CodeGen.ARM32Test where
 
 import Data.ByteString.Lazy (ByteString)
 import PyF
@@ -8,7 +8,7 @@ import Test.Tasty
 import Test.Tasty.Golden (goldenVsStringDiff)
 import Test.Tasty.HUnit
 
-import ASM
+import CodeGen.ARM32
 import AST
 import qualified Data.Map.Ordered.Strict as OMap
 import qualified Data.Text.Lazy as Text
@@ -22,41 +22,41 @@ diffCmd ref new = ["delta", "--diff-so-fancy", "--paging=never", ref, new]
 specs :: TestTree
 specs =
   testGroup
-    "ASM Tests"
+    "ASM Tests: ARM32"
     [ goldenVsStringDiff
         "Emit empty Main"
         diffCmd
-        "./test/golden/asm/empty-main.s"
+        "./test/golden/asm/arm32/empty-main.s"
         emitEmptyMainTest
     , goldenVsStringDiff
         "Emit assert"
         diffCmd
-        "./test/golden/asm/assert.s"
+        "./test/golden/asm/arm32/assert.s"
         emitAssertTest
     , goldenVsStringDiff
         "Emit assert + negation"
         diffCmd
-        "./test/golden/asm/assert-negation.s"
+        "./test/golden/asm/arm32/assert-negation.s"
         emitAssertNegationTest
     , goldenVsStringDiff
         "Emit block + infix operators"
         diffCmd
-        "./test/golden/asm/block-and-infix.s"
+        "./test/golden/asm/arm32/block-and-infix.s"
         emitBlockAndInfixTest
     , goldenVsStringDiff
         "Emit if and labels"
         diffCmd
-        "./test/golden/asm/if-and-labels.s"
+        "./test/golden/asm/arm32/if-and-labels.s"
         emitIfAndLabelsTest
     , goldenVsStringDiff
         "Emit Var"
         diffCmd
-        "./test/golden/asm/var.s"
+        "./test/golden/asm/arm32/var.s"
         emitVarTest
     , goldenVsStringDiff
         "While"
         diffCmd
-        "./test/golden/asm/while.s"
+        "./test/golden/asm/arm32/while.s"
         emitWhileTest
     ]
 

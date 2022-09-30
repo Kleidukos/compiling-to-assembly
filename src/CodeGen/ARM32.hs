@@ -4,7 +4,7 @@
    1 ~ True
    0 ~ False
 -}
-module ASM where
+module CodeGen.ARM32 where
 
 import Control.Concurrent.MVar (MVar)
 import qualified Control.Concurrent.MVar as MVar

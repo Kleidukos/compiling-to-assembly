@@ -3,7 +3,7 @@ module Main (main) where
 import System.IO
 import Test.Tasty
 
-import qualified ASMTest
+import qualified CodeGen.ARM32Test as ARM32Test
 import qualified ParserTest
 import qualified TCTest
 
@@ -14,6 +14,6 @@ main = do
     testGroup
       "Compiler Tests"
       [ ParserTest.specs
-      , ASMTest.specs
+      , ARM32Test.specs
       , TCTest.specs
       ]
