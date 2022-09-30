@@ -1,6 +1,6 @@
 module Utils where
 
-import qualified Data.ByteString as BS
+import qualified Data.ByteString.Char8 as C8
 import Data.Kind
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
@@ -18,4 +18,4 @@ iforM list fun = go ilist
     go l = mapM (uncurry fun) l
 
 say :: String -> IO ()
-say = BS.hPutStrLn stdout . Text.encodeUtf8 . Text.pack
+say = C8.hPutStrLn stdout . Text.encodeUtf8 . Text.pack
